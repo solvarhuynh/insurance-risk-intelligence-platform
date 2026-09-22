@@ -17,6 +17,7 @@ Luu y quan trong:
   Khong ket noi database, khong chay container va khong xac nhan RUNTIME_PASS.
 """
 
+import csv
 import json
 import os
 import py_compile
@@ -42,6 +43,12 @@ REQUIRED_CANONICAL_FILES = [
     "ml/predict_risk_batch.py",
     "notebooks/01-eda.ipynb",
     "data/raw/.gitkeep",
+    "data/raw/brvehins1/brvehins1a.csv",
+    "data/raw/brvehins1/brvehins1b.csv",
+    "data/raw/brvehins1/brvehins1c.csv",
+    "data/raw/brvehins1/brvehins1d.csv",
+    "data/raw/brvehins1/brvehins1e.csv",
+    "data/raw/susep.gov.br/insurance_dataset.csv",
     "powerbi/.gitkeep",
     "scripts/validate_repo.py",
     "sql/01_load_staging.sql",
@@ -96,6 +103,7 @@ def check_canonical_files(reporter: ValidationReporter):
 
 def check_docker_compose(reporter: ValidationReporter):
     print("\n--- 2. Kiem tra Docker Compose Configuration ---")
+    print("\n--- 3. Kiem tra Docker Compose Configuration ---")
     compose_path = REPO_ROOT / "docker-compose.yml"
     if not compose_path.exists():
         reporter.add("Docker Compose", "docker-compose.yml", "FAIL", "Khong tim thay tep")
@@ -134,6 +142,7 @@ def check_docker_compose(reporter: ValidationReporter):
 
 def check_python_files(reporter: ValidationReporter):
     print("\n--- 3. Bien dich cu phap Python (py_compile) ---")
+    print("\n--- 4. Bien dich cu phap Python (py_compile) ---")
     py_dirs = ["dags", "ml", "scripts"]
     for d in py_dirs:
         dir_path = REPO_ROOT / d
@@ -150,6 +159,7 @@ def check_python_files(reporter: ValidationReporter):
 
 def check_notebooks(reporter: ValidationReporter):
     print("\n--- 4. Parse Notebooks (JSON validity) ---")
+    print("\n--- 5. Parse Notebooks (JSON validity) ---")
     nb_dir = REPO_ROOT / "notebooks"
     if not nb_dir.exists():
         reporter.add("Notebooks", "notebooks/", "SKIPPED", "Thu muc notebooks khong ton tai")
@@ -175,6 +185,7 @@ def check_notebooks(reporter: ValidationReporter):
 
 def check_sql_files(reporter: ValidationReporter):
     print("\n--- 5. Kiem tra cau truc cac tep SQL ---")
+    print("\n--- 6. Kiem tra cau truc cac tep SQL ---")
     sql_dirs = ["sql", "migrations"]
     for d in sql_dirs:
         dir_path = REPO_ROOT / d
@@ -203,6 +214,7 @@ def check_sql_files(reporter: ValidationReporter):
 
 def check_duplicate_canonical_files(reporter: ValidationReporter):
     print("\n--- 6. Kiem tra trung lap ten file canonical co ban ---")
+    print("\n--- 7. Kiem tra trung lap ten file canonical co ban ---")
     # Kiem tra cac file script hoac rule co bi tao trung lap o thu muc khac khong
     basenames = {}
     ignore_dirs = {".git", ".venv", "__pycache__"}
@@ -225,19 +237,61 @@ def check_duplicate_canonical_files(reporter: ValidationReporter):
         reporter.add("Duplicate Check", "Canonical Basenames", "PASS", "Khong co trung lap ten file bat thuong")
 
 
+def check_raw_dataset_brvehins1(reporter: ValidationReporter):
+    print("\n--- 2. Kiem tra tap du lieu tho canonical brvehins1 ---")
+    br_dir = REPO_ROOT / "data" / "raw" / "brvehins1"
+    if not br_dir.exists() or not br_dir.is_dir():
+        reporter.add("Raw Dataset", "data/raw/brvehins1", "FAIL", "Thu muc khong ton tai")
+        return
+
+    partitions = ["brvehins1a.csv", "brvehins1b.csv", "brvehins1c.csv", "brvehins1d.csv", "brvehins1e.csv"]
+    headers = {}
+    for p in partitions:
+        p_path = br_dir / p
+        if not p_path.exists():
+            reporter.add("Raw Dataset", f"brvehins1/{p}", "FAIL", "Tep khong ton tai")
+            continue
+        size = p_path.stat().st_size
+        if size == 0:
+            reporter.add("Raw Dataset", f"brvehins1/{p}", "FAIL", "Tep rong (0 bytes)")
+            continue
+        try:
+            with open(p_path, "r", encoding="utf-8", errors="replace") as f:
+                reader = csv.reader(f)
+                header = next(reader)
+                headers[p] = header
+        except Exception as e:
+            reporter.add("Raw Dataset", f"brvehins1/{p}", "FAIL", f"Loi doc header: {e}")
+
+    if len(headers) == len(partitions):
+        base_header = headers["brvehins1a.csv"]
+        all_match = all(h == base_header for h in headers.values())
+        if all_match:
+            reporter.add("Raw Dataset", "brvehins1 partitions", "PASS", f"5 phan doan hop le, schema dong nhat ({len(base_header)} cot)")
+        else:
+            reporter.add("Raw Dataset", "brvehins1 partitions", "FAIL", "Schema giua cac phan doan khong khop nhau")
+
+
 def report_skipped_runtime_validations(reporter: ValidationReporter):
     print("\n--- 7. Danh muc kiem tra Runtime duoc SKIPPED (PENDING_RUNTIME) ---")
+    print("\n--- 8. Danh muc kiem tra Runtime duoc SKIPPED (PENDING_RUNTIME) ---")
     skipped_items = [
         ("SQL Server Connectivity", "Ket noi mang toi localhost:1433", "Chua khoi dong container sqlserver"),
         ("Flyway / DbUp Migration", "Thuc thi V1__create_dwh_schema.sql tao DWH_Insurance", "Can SQL Server runtime va cong cu migration"),
         ("Staging BULK INSERT", "Nap du lieu CSV tho vao Staging_InsuranceRaw", "Can du lieu CSV that va SQL Server runtime"),
+        ("Staging BULK INSERT", "Nap 5 phan doan CSV brvehins1 vao Staging_InsuranceRaw", "Can SQL Server runtime va kiem tra BULK INSERT"),
         ("CDC Enable & Capture", "Kich hoat sys.sp_cdc_enable_db va bat LSN watermark", "Can SQL Server Agent runtime"),
         ("SCD2 Idempotency", "sp_Load_DimCustomer kiem tra versioning va idempotent rerun", "Can du lieu Staging va database runtime"),
         ("Fact Referential Integrity", "sp_Load_FactPremium, sp_Load_FactClaims FK integrity", "Can cac bang Dim duoc nap truoc"),
         ("Data Quality Execution", "sp_Run_DataQualityChecks va kiem tra ngat pipeline", "Can cac bang Fact/Dim trong DWH"),
+        ("SCD2 / Dimension Load", "Nap Dimension theo data contract brvehins1", "Can du lieu Staging va database runtime"),
+        ("Fact Referential Integrity", "sp_Load_Fact* FK integrity theo schema brvehins1", "Can cac bang Dim duoc nap truoc"),
+        ("Data Quality Execution", "sp_Run_DataQualityChecks theo cac rule brvehins1", "Can cac bang Fact/Dim trong DWH"),
         ("Airflow DAG Run", "Thuc thi insurance_dwh_pipeline tren webserver/scheduler", "Can khoi dong Airflow container"),
         ("ML Model Training", "Huan luyen mo hinh tu du lieu Porto Seguro that", "Can du lieu train.csv va scikit-learn"),
         ("Performance Benchmark", "Do STATISTICS IO/TIME truoc va sau khi tao index", "Can du lieu Fact ~8-10 trieu dong tren DWH"),
+        ("ML Model Training", "Huan luyen mo hinh tu du lieu brvehins1", "Can hoan thien data contract va scikit-learn"),
+        ("Performance Benchmark", "Do STATISTICS IO/TIME truoc va sau khi tao index", "Can du lieu Fact ~2 trieu dong tren DWH"),
         ("Power BI Dashboard", "Kiem tra ket noi truc tiep Power BI toi DWH_Insurance", "Can DWH hoan thanh va Power BI Desktop"),
     ]
     for item, action, reason in skipped_items:
@@ -252,6 +306,7 @@ def main():
 
     reporter = ValidationReporter()
     check_canonical_files(reporter)
+    check_raw_dataset_brvehins1(reporter)
     check_docker_compose(reporter)
     check_python_files(reporter)
     check_notebooks(reporter)

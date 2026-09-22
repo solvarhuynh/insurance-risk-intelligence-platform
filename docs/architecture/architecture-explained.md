@@ -1,23 +1,25 @@
-# Kiến trúc dự án, giải thích theo luồng dữ liệu
+# Kiến trúc dự án, giải thích theo luồng dữ liệu (brvehins1)
 
 ## Dự án này giải quyết việc gì?
 
-Dự án xây dựng một **Data Warehouse** kết hợp **Machine Learning Batch Pipeline**: kho dữ liệu được tổ chức chuẩn mực theo mô hình Star Schema trên Microsoft SQL Server để phục vụ báo cáo phân tích và dự đoán rủi ro. Bài toán là tổng hợp dữ liệu phí bảo hiểm và bồi thường từ thị trường bảo hiểm Brazil (SUSEP ~8.3M dòng), kết hợp với dữ liệu khách hàng và lịch sử tổn thất xe cơ giới từ Porto Seguro (~1.5M dòng), từ đó phân tích doanh thu, bồi thường và dự đoán xác suất phát sinh tổn thất bằng mô hình học máy.
+Dự án xây dựng một **Motor Insurance Data Warehouse** kết hợp **Machine Learning Batch Pipeline**: kho dữ liệu được tổ chức chuẩn mực theo mô hình Star Schema trên Microsoft SQL Server để phục vụ báo cáo phân tích rủi ro và tổn thất bảo hiểm xe cơ giới. Nguồn dữ liệu thực tế được sử dụng là **brvehins1** (từ hệ sinh thái CASdatasets / AUTOSEG / SUSEP), quy mô ~1.965 triệu dòng dữ liệu chia làm 5 phân đoạn CSV (`brvehins1[a-e].csv`), ghi nhận mức độ phơi nhiễm (exposure), doanh thu phí và các vụ bồi thường tổn thất xe theo nhóm người lái, dòng xe và khu vực địa lý tại Brazil.
 
-Mục tiêu là xây dựng một hệ thống End-to-End trọn vẹn: quy trình ETL tự động, chịu lỗi, có kiểm tra chất lượng dữ liệu, có đo lường tối ưu hiệu năng (Performance Tuning), và có luồng dự đoán rủi ro (Batch Inference) phục vụ trực tiếp cho Power BI.
+Mục tiêu là xây dựng một hệ thống End-to-End trọn vẹn: quy trình nạp Staging, luồng ETL tự động với CDC, kiểm tra chất lượng dữ liệu (DQ Check), đo lường và tối ưu hóa hiệu năng (Performance Tuning), và xây dựng luồng dự đoán rủi ro (Batch Inference) phục vụ trực tiếp cho báo cáo phân tích Power BI.
+
+---
 
 ## Dữ liệu đi từ đâu đến đâu?
 
 ```text
-CSV SUSEP (~8.3M rows) + CSV Porto Seguro (~1.5M rows)
+Raw brvehins1 (5 partitions: brvehins1[a-e].csv ~1.965M rows)
                     |
                     v
-    Staging_InsuranceRaw trong SQL Server
+    Staging_InsuranceRaw trong SQL Server (stg_brvehins1)
                     |
                     v
             DWH_Insurance:
-   (Fact_Premium, Fact_Claims, Dim_Customer SCD2,
-        Dim_Policy, Dim_Date, Dim_Region)
+    Dimensions: Dim_Driver, Dim_Vehicle, Dim_Geography
+    Facts: Fact_Policy_Exposure, Fact_Claims, Fact_Risk_Prediction
                     |
                     +------------------------------------------+
                     |                                          |
@@ -31,7 +33,7 @@ CSV SUSEP (~8.3M rows) + CSV Porto Seguro (~1.5M rows)
                     +<-----------------------------------------+
                     | (Lưu kết quả dự đoán)
                     v
-      Fact_Customer_Risk_Prediction
+          Fact_Risk_Prediction
                     |
                     +--> Đo và tối ưu truy vấn SQL (Tuning)
                     |
@@ -39,29 +41,31 @@ CSV SUSEP (~8.3M rows) + CSV Porto Seguro (~1.5M rows)
       Power BI: Dashboard tổn thất, xu hướng & rủi ro dự đoán
 ```
 
-1. **Dữ liệu nguồn**: Gồm SUSEP (~8.3 triệu dòng phí và bồi thường theo công ty, sản phẩm, bang, tháng) và Porto Seguro (~1.5 triệu dòng thông tin khách hàng, đặc trưng xe và lịch sử claim). Cả hai đều xuất phát từ thị trường bảo hiểm Brazil, đạt tổng dung lượng thô ~2.0 — 2.5 GB.
-2. **Staging**: File CSV được nạp nguyên trạng vào `Staging_InsuranceRaw` bằng `BULK INSERT` qua script `sql/01_load_staging.sql`.
-3. **DWH Star Schema**: Các Stored Procedure T-SQL chuyển dữ liệu từ staging vào kho `DWH_Insurance`, lấy dữ liệu mới/thay đổi qua CDC và nạp vào các bảng Fact/Dimension.
-4. **Data Quality**: Pipeline tự động kiểm tra các quy tắc toàn vẹn (Not Null, Unique, Referential Integrity, Range check) và ghi log vào `DQ_Check_Log`.
-5. **Machine Learning Batch Inference**: Task Airflow gọi `ml/predict_risk_batch.py` trích xuất feature từ DWH, tính toán điểm rủi ro (`PredictedClaimProbability`, `RiskCategory`) và gọi `sql/08_sp_load_risk_predictions.sql` để lưu kết quả vào `Fact_Customer_Risk_Prediction`.
-6. **Analytics & Performance Tuning**: Dữ liệu trong DWH được tối ưu truy vấn bằng Indexing/Partitioning, và trực quan hóa toàn diện trên Power BI Desktop.
+1. **Dữ liệu nguồn canonical**: Tập dữ liệu `brvehins1` (5 phân đoạn CSV trong `data/raw/brvehins1/`, tổng 1.965.355 dòng, 23 cột). Nguồn dữ liệu cũ `data/raw/susep.gov.br/insurance_dataset.csv` được lưu trữ dưới dạng **LEGACY / NON-CANONICAL** và không thuộc luồng dữ liệu xử lý.
+2. **Staging**: 5 phân đoạn CSV được nạp nguyên trạng vào database `Staging_InsuranceRaw` bằng lệnh `BULK INSERT`.
+3. **DWH Star Schema**: Các Stored Procedure T-SQL chuyển dữ liệu từ staging vào kho `DWH_Insurance`, áp dụng CDC để chỉ xử lý dữ liệu mới/thay đổi và nạp vào các bảng Dimension và Fact.
+4. **Data Quality**: Pipeline tự động kiểm tra các quy tắc toàn vẹn (Not Null, Unique, Referential Integrity, Range check đối với phí và bồi thường) và ghi log vào `DQ_Check_Log`.
+5. **Machine Learning Batch Inference**: Task Airflow gọi `ml/predict_risk_batch.py` trích xuất feature từ DWH, tính toán rủi ro tổn thất theo hồ sơ xe/người lái và lưu kết quả vào bảng sự kiện dự đoán.
+6. **Analytics & Performance Tuning**: DWH được tối ưu truy vấn bằng Indexing/Partitioning trên tập dữ liệu ~2 triệu dòng, và trực quan hóa toàn diện trên Power BI Desktop.
+
+---
 
 ## Các quyết định thiết kế
 
-### Star Schema
-- Dùng **Star Schema** với các bảng sự kiện (`Fact_Premium`, `Fact_Claims`, `Fact_Customer_Risk_Prediction`) và các bảng chiều (`Dim_Customer`, `Dim_Policy`, `Dim_Date`, `Dim_Region`). Mô hình này tối ưu cho việc truy vấn tổng hợp đa chiều và tích hợp trực tiếp vào Power BI.
-
-### Dim_Customer dùng SCD Type 2
-- Khách hàng từ tập dữ liệu Porto Seguro (~1.5 triệu dòng) áp dụng **SCD Type 2** (`Start_Date`, `End_Date`, `Is_Current`) để lưu vết lịch sử biến động thông tin theo thời gian, đảm bảo tính chính xác cho các giao dịch trong quá khứ.
+### Star Schema xoay quanh thực thể xe cơ giới
+- Dùng **Star Schema** với các bảng chiều (`Dim_Driver`, `Dim_Vehicle`, `Dim_Geography`) và các bảng sự kiện (`Fact_Policy_Exposure`, `Fact_Claims`, `Fact_Risk_Prediction`). Mô hình này bám sát cấu trúc tự nhiên của `brvehins1` (không tự bịa đặt CustomerId hay PolicyNumber vốn không tồn tại trong dữ liệu gốc), tối ưu hóa cho truy vấn phân tích Loss Ratio và tần suất bồi thường.
 
 ### CDC (Change Data Capture) thay vì nạp lại toàn bộ
-- Nguồn dữ liệu lên tới hàng triệu dòng. Dùng **CDC** và bảng `ETL_Watermark` giúp chỉ nạp phần dữ liệu thay đổi, tiết kiệm tài nguyên và rút ngắn thời gian chạy batch.
+- Nguồn dữ liệu gồm gần 2 triệu dòng. Áp dụng **CDC** và cơ chế Watermark giúp chỉ nạp phần dữ liệu mới/thay đổi, tiết kiệm I/O đĩa và rút ngắn thời gian chạy batch.
 
 ### Machine Learning Batch Inference tích hợp vào Airflow
-- Thay vì tách rời mô hình ML như một bài toán nghiên cứu độc lập, dự án xem DWH như một **Feature Store**. Airflow điều phối việc chạy model scoring định kỳ và ghi ngược kết quả vào DWH để Power BI có thể so sánh giữa *Rủi ro dự đoán* và *Tổn thất thực tế (Loss Ratio)*.
+- Thay vì tách rời mô hình ML, dự án xem DWH như một **Feature Store**. Airflow điều phối việc chạy model scoring định kỳ và ghi ngược kết quả vào DWH để Power BI có thể so sánh giữa *Rủi ro dự đoán* và *Tổn thất thực tế*.
 
 ### Audit Log và Idempotency
-- Mọi Stored Procedure đều được bọc trong `TRY...CATCH`, ghi nhận nhật ký vào `ETL_Audit_Log` và sử dụng lệnh `MERGE` để đảm bảo khi chạy lại cùng một batch sẽ không làm nhân đôi hoặc sai lệch dữ liệu.
+- Mọi Stored Procedure đều được bọc trong khối `TRY...CATCH`, ghi nhận nhật ký vào `ETL_Audit_Log` và sử dụng lệnh `MERGE` để đảm bảo tính idempotent: chạy lại cùng một batch không gây trùng lặp hay sai lệch số liệu.
 
 ### Tối ưu truy vấn bằng Index dựa trên đo đạc thực tế
-- Trên Fact Table quy mô 8-10 triệu dòng, việc đo lường Execution Plan và `STATISTICS IO, TIME` trước và sau khi tạo Non-Clustered/Covering Index giúp chứng minh rõ ràng năng lực Performance Tuning.
+- Trên Fact Table quy mô ~2 triệu dòng, việc đo lường Execution Plan và `STATISTICS IO, TIME` trước và sau khi tạo Index giúp chứng minh rõ ràng năng lực Performance Tuning.
+
+### Định vị dữ liệu Legacy (susep.gov.br)
+- File `data/raw/susep.gov.br/insurance_dataset.csv` là dữ liệu báo cáo thống kê thị trường vĩ mô từ dự án trước. File này được bảo toàn nguyên vẹn trong thư mục raw nhưng được gắn nhãn LEGACY, không tham gia vào pipeline canonical `brvehins1`.

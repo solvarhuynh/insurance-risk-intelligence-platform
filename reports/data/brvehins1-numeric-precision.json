@@ -1,0 +1,156 @@
+{
+  "source_directory": "data/raw/brvehins1",
+  "partitions": [
+    "brvehins1a.csv",
+    "brvehins1b.csv",
+    "brvehins1c.csv",
+    "brvehins1d.csv",
+    "brvehins1e.csv"
+  ],
+  "total_rows": 1965355,
+  "method": "csv.DictReader streaming + Decimal lexical precision; raw files are read only",
+  "decimal_precision_profile": {
+    "ExposTotal": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 17,
+      "max_integer_digits": 4,
+      "sample_at_max_fractional_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 35,
+        "raw_value": "0.00547945220023394"
+      },
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 4166,
+        "raw_value": "1114.92"
+      },
+      "recommended_sql_logical_type": "DECIMAL(21,17)"
+    },
+    "ExposFireRob": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 0,
+      "max_integer_digits": 1,
+      "sample_at_max_fractional_digits": null,
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 1,
+        "raw_value": "0"
+      },
+      "recommended_sql_logical_type": "DECIMAL(1,0)"
+    },
+    "PremTotal": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 27,
+      "max_integer_digits": 7,
+      "sample_at_max_fractional_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 84933,
+        "raw_value": "4.54747350886464e-13"
+      },
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 82977,
+        "raw_value": "1069716.4"
+      },
+      "recommended_sql_logical_type": "DECIMAL(34,27)"
+    },
+    "PremFireRob": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 0,
+      "max_integer_digits": 1,
+      "sample_at_max_fractional_digits": null,
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 1,
+        "raw_value": "0"
+      },
+      "recommended_sql_logical_type": "DECIMAL(1,0)"
+    },
+    "SumInsAvg": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 2,
+      "max_integer_digits": 7,
+      "sample_at_max_fractional_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 1,
+        "raw_value": "10852.99"
+      },
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1c.csv",
+        "source_row_number": 323025,
+        "raw_value": "1100000"
+      },
+      "recommended_sql_logical_type": "DECIMAL(9,2)"
+    },
+    "ClaimAmountRob": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 0,
+      "max_integer_digits": 7,
+      "sample_at_max_fractional_digits": null,
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1b.csv",
+        "source_row_number": 20351,
+        "raw_value": "1139076"
+      },
+      "recommended_sql_logical_type": "DECIMAL(7,0)"
+    },
+    "ClaimAmountPartColl": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 0,
+      "max_integer_digits": 7,
+      "sample_at_max_fractional_digits": null,
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 142138,
+        "raw_value": "1363938"
+      },
+      "recommended_sql_logical_type": "DECIMAL(7,0)"
+    },
+    "ClaimAmountTotColl": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 0,
+      "max_integer_digits": 7,
+      "sample_at_max_fractional_digits": null,
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1b.csv",
+        "source_row_number": 53411,
+        "raw_value": "1110048"
+      },
+      "recommended_sql_logical_type": "DECIMAL(7,0)"
+    },
+    "ClaimAmountFire": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 0,
+      "max_integer_digits": 6,
+      "sample_at_max_fractional_digits": null,
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 33320,
+        "raw_value": "115500"
+      },
+      "recommended_sql_logical_type": "DECIMAL(6,0)"
+    },
+    "ClaimAmountOther": {
+      "rows": 1965355,
+      "parse_errors": 0,
+      "max_fractional_digits": 0,
+      "max_integer_digits": 6,
+      "sample_at_max_fractional_digits": null,
+      "sample_at_max_integer_digits": {
+        "partition": "brvehins1a.csv",
+        "source_row_number": 15225,
+        "raw_value": "101791"
+      },
+      "recommended_sql_logical_type": "DECIMAL(6,0)"
+    }
+  }
+}

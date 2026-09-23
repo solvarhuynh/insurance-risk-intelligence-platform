@@ -1,173 +1,132 @@
--- ============================================================================
--- Migration: V1__create_dwh_schema.sql
--- Giai doan: Giai doan 3 — Thiet ke Data Warehouse & Schema Migration
--- Cong cu: Flyway / DbUp (version-controlled migration)
--- Muc dich: Tao database DWH_Insurance va toan bo bang Fact/Dim theo kien truc
---           Star Schema, bao gom Primary Key, Foreign Key, Business Key va Surrogate Key.
--- Tham chieu: docs/specs/implementation-guide.md
---
--- Danh sach cac bang trong Star Schema:
---   1. Dim_Date: Bang chieu thoi gian chuan (ngay, thang, quy, nam)
---   2. Dim_Region: Bang chieu dia ly / bang / khu vuc (tu nguon SUSEP)
---   3. Dim_Policy: Bang chieu loai san pham bao hiem, dac diem hop dong
---   4. Dim_Customer: Bang chieu khach hang ap dung SCD Type 2 (tu nguon Porto Seguro ~1.5M dong)
---   5. Fact_Premium: Bang su kien thu phi bao hiem (gia tri phi, so hop dong)
---   6. Fact_Claims: Bang su kien boi thuong bao hiem (gia tri boi thuong, so vu claim)
---   7. Fact_Customer_Risk_Prediction: Bang su kien luu diem du doan rui ro tu Machine Learning
--- ============================================================================
+-- V1: Idempotent bootstrap for the canonical brvehins1 foundation.
+-- This migration creates only database-level metadata and audit objects.
+-- Business staging, dimensions, facts and DQ rules are added by later versions.
 
--- ----------------------------------------------------------------------------
--- 1. Tao Database DWH_Insurance (neu duoc phep boi migration tool)
--- ----------------------------------------------------------------------------
--- TODO: Khoi tao database DWH_Insurance neu chua co
-/*
-IF NOT EXISTS (SELECT * FROM sys.databases WHERE name = 'DWH_Insurance')
+USE master;
+GO
+
+IF DB_ID(N'DWH_Insurance') IS NULL
 BEGIN
-    CREATE DATABASE DWH_Insurance;
-END
+    CREATE DATABASE [DWH_Insurance];
+END;
 GO
 
-USE DWH_Insurance;
+USE [DWH_Insurance];
 GO
-*/
 
--- ----------------------------------------------------------------------------
--- 2. DDL: Dim_Date
--- ----------------------------------------------------------------------------
--- TODO: Dinh nghia bang Dim_Date
-/*
-CREATE TABLE dbo.Dim_Date (
-    DateKey INT NOT NULL PRIMARY KEY,            -- YYYYMMDD
-    FullDate DATE NOT NULL,
-    DayNumberOfWeek TINYINT NOT NULL,
-    DayName NVARCHAR(20) NOT NULL,
-    DayNumberOfMonth TINYINT NOT NULL,
-    DayNumberOfYear SMALLINT NOT NULL,
-    MonthNumberOfYear TINYINT NOT NULL,
-    MonthName NVARCHAR(20) NOT NULL,
-    Quarter TINYINT NOT NULL,
-    CalendarYear INT NOT NULL
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+GO
+
+IF SCHEMA_ID(N'meta') IS NULL EXEC(N'CREATE SCHEMA meta AUTHORIZATION dbo;');
+IF SCHEMA_ID(N'stg') IS NULL EXEC(N'CREATE SCHEMA stg AUTHORIZATION dbo;');
+IF SCHEMA_ID(N'dwh') IS NULL EXEC(N'CREATE SCHEMA dwh AUTHORIZATION dbo;');
+IF SCHEMA_ID(N'dq') IS NULL EXEC(N'CREATE SCHEMA dq AUTHORIZATION dbo;');
+GO
+
+IF OBJECT_ID(N'meta.SchemaVersion', N'U') IS NULL
+BEGIN
+    CREATE TABLE meta.SchemaVersion (
+        MigrationVersion NVARCHAR(50) NOT NULL PRIMARY KEY,
+        Description NVARCHAR(255) NOT NULL,
+        AppliedAtUtc DATETIME2(3) NOT NULL CONSTRAINT DF_SchemaVersion_AppliedAtUtc DEFAULT SYSUTCDATETIME(),
+        AppliedBy NVARCHAR(128) NOT NULL CONSTRAINT DF_SchemaVersion_AppliedBy DEFAULT SUSER_SNAME()
+    );
+END;
+GO
+
+IF OBJECT_ID(N'meta.SourceFileManifest', N'U') IS NULL
+BEGIN
+    CREATE TABLE meta.SourceFileManifest (
+        SourceFile NVARCHAR(128) NOT NULL PRIMARY KEY,
+        ExpectedSourceRows BIGINT NOT NULL,
+        IsCanonical BIT NOT NULL CONSTRAINT DF_SourceFileManifest_IsCanonical DEFAULT 1,
+        CreatedAtUtc DATETIME2(3) NOT NULL CONSTRAINT DF_SourceFileManifest_CreatedAtUtc DEFAULT SYSUTCDATETIME(),
+        CONSTRAINT CK_SourceFileManifest_ExpectedSourceRows CHECK (ExpectedSourceRows > 0)
+    );
+END;
+GO
+
+INSERT INTO meta.SourceFileManifest (SourceFile, ExpectedSourceRows, IsCanonical)
+SELECT source_values.SourceFile, source_values.ExpectedSourceRows, 1
+FROM (VALUES
+    (N'brvehins1a.csv', CONVERT(BIGINT, 393071)),
+    (N'brvehins1b.csv', CONVERT(BIGINT, 393071)),
+    (N'brvehins1c.csv', CONVERT(BIGINT, 393071)),
+    (N'brvehins1d.csv', CONVERT(BIGINT, 393071)),
+    (N'brvehins1e.csv', CONVERT(BIGINT, 393071))
+) AS source_values (SourceFile, ExpectedSourceRows)
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM meta.SourceFileManifest AS target
+    WHERE target.SourceFile = source_values.SourceFile
 );
 GO
-*/
 
--- ----------------------------------------------------------------------------
--- 3. DDL: Dim_Region
--- ----------------------------------------------------------------------------
--- TODO: Dinh nghia bang Dim_Region (Surrogate Key: RegionKey, Business Key: RegionCode/StateCode)
-/*
-CREATE TABLE dbo.Dim_Region (
-    RegionKey INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    RegionCode NVARCHAR(20) NOT NULL,            -- Business Key
-    RegionName NVARCHAR(100) NULL,
-    StateCode NVARCHAR(10) NULL,
-    CountryName NVARCHAR(50) DEFAULT 'Brazil'
-);
+IF OBJECT_ID(N'meta.IngestionBatch', N'U') IS NULL
+BEGIN
+    CREATE TABLE meta.IngestionBatch (
+        BatchId UNIQUEIDENTIFIER NOT NULL PRIMARY KEY,
+        SourceFile NVARCHAR(128) NOT NULL,
+        ExpectedSourceRows BIGINT NOT NULL,
+        StagingRows BIGINT NULL,
+        RejectedRows BIGINT NOT NULL CONSTRAINT DF_IngestionBatch_RejectedRows DEFAULT 0,
+        StartedAtUtc DATETIME2(3) NOT NULL CONSTRAINT DF_IngestionBatch_StartedAtUtc DEFAULT SYSUTCDATETIME(),
+        CompletedAtUtc DATETIME2(3) NULL,
+        ElapsedMilliseconds BIGINT NULL,
+        Status NVARCHAR(20) NOT NULL,
+        ErrorMessage NVARCHAR(MAX) NULL,
+        CONSTRAINT FK_IngestionBatch_SourceFileManifest
+            FOREIGN KEY (SourceFile) REFERENCES meta.SourceFileManifest (SourceFile),
+        CONSTRAINT CK_IngestionBatch_Status
+            CHECK (Status IN (N'RUNNING', N'SUCCESS', N'FAILED', N'SKIPPED')),
+        CONSTRAINT CK_IngestionBatch_ExpectedSourceRows CHECK (ExpectedSourceRows > 0),
+        CONSTRAINT CK_IngestionBatch_RejectedRows CHECK (RejectedRows >= 0)
+    );
+END;
 GO
-*/
 
--- ----------------------------------------------------------------------------
--- 4. DDL: Dim_Policy
--- ----------------------------------------------------------------------------
--- TODO: Dinh nghia bang Dim_Policy (Surrogate Key: PolicyKey, Business Key: PolicyTypeCode/ProductCode)
-/*
-CREATE TABLE dbo.Dim_Policy (
-    PolicyKey INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    PolicyNumber NVARCHAR(50) NOT NULL,          -- Business Key
-    PolicyTypeCode NVARCHAR(50) NULL,
-    PolicyTypeName NVARCHAR(100) NULL,
-    CoverageCategory NVARCHAR(100) NULL,
-    RiskCategory NVARCHAR(50) NULL
-);
+IF NOT EXISTS (
+    SELECT 1 FROM sys.indexes
+    WHERE object_id = OBJECT_ID(N'meta.IngestionBatch')
+      AND name = N'UX_IngestionBatch_SuccessfulSourceFile'
+)
+BEGIN
+    CREATE UNIQUE INDEX UX_IngestionBatch_SuccessfulSourceFile
+        ON meta.IngestionBatch (SourceFile)
+        WHERE Status = N'SUCCESS';
+END;
 GO
-*/
 
--- ----------------------------------------------------------------------------
--- 5. DDL: Dim_Customer (SCD Type 2)
--- ----------------------------------------------------------------------------
--- TODO: Dinh nghia bang Dim_Customer ap dung SCD Type 2 (nguon Porto Seguro ~1.5M dong)
-/*
-CREATE TABLE dbo.Dim_Customer (
-    CustomerKey INT IDENTITY(1,1) NOT NULL PRIMARY KEY,  -- Surrogate Key
-    CustomerId INT NOT NULL,                             -- Business Key (Id tu Porto Seguro)
-    IndGroupCategory NVARCHAR(50) NULL,                  -- Nhom dac trung ca nhan (ps_ind_*)
-    CarCategory NVARCHAR(50) NULL,                       -- Nhom dac trung xe (ps_car_*)
-    CalcScore DECIMAL(10,4) NULL,                        -- Chi so rui ro tinh toan (ps_calc_*)
-    -- Cac cot SCD Type 2:
-    Start_Date DATETIME2 NOT NULL,
-    End_Date DATETIME2 NULL,
-    Is_Current BIT NOT NULL DEFAULT 1
-);
+IF OBJECT_ID(N'meta.PipelineAudit', N'U') IS NULL
+BEGIN
+    CREATE TABLE meta.PipelineAudit (
+        AuditId BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
+        BatchId UNIQUEIDENTIFIER NULL,
+        StageName NVARCHAR(128) NOT NULL,
+        EventAtUtc DATETIME2(3) NOT NULL CONSTRAINT DF_PipelineAudit_EventAtUtc DEFAULT SYSUTCDATETIME(),
+        Status NVARCHAR(20) NOT NULL,
+        RowsAffected BIGINT NULL,
+        Detail NVARCHAR(MAX) NULL,
+        CONSTRAINT FK_PipelineAudit_IngestionBatch
+            FOREIGN KEY (BatchId) REFERENCES meta.IngestionBatch (BatchId),
+        CONSTRAINT CK_PipelineAudit_Status
+            CHECK (Status IN (N'STARTED', N'SUCCESS', N'FAILED', N'WARNING', N'SKIPPED'))
+    );
+END;
 GO
-CREATE INDEX IX_Dim_Customer_BusinessKey ON dbo.Dim_Customer (CustomerId, Is_Current);
-GO
-*/
 
--- ----------------------------------------------------------------------------
--- 6. DDL: Fact_Premium
--- ----------------------------------------------------------------------------
--- TODO: Dinh nghia bang Fact_Premium voi Foreign Keys toi cac Dim
-/*
-CREATE TABLE dbo.Fact_Premium (
-    PremiumFactKey BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    CustomerKey INT NOT NULL,
-    PolicyKey INT NOT NULL,
-    DateKey INT NOT NULL,
-    RegionKey INT NOT NULL,
-    -- Measures
-    PremiumAmount DECIMAL(18,2) NOT NULL,
-    PolicyCount INT DEFAULT 1,
-    CreatedDate DATETIME2 DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT FK_Fact_Premium_Customer FOREIGN KEY (CustomerKey) REFERENCES dbo.Dim_Customer(CustomerKey),
-    CONSTRAINT FK_Fact_Premium_Policy FOREIGN KEY (PolicyKey) REFERENCES dbo.Dim_Policy(PolicyKey),
-    CONSTRAINT FK_Fact_Premium_Date FOREIGN KEY (DateKey) REFERENCES dbo.Dim_Date(DateKey),
-    CONSTRAINT FK_Fact_Premium_Region FOREIGN KEY (RegionKey) REFERENCES dbo.Dim_Region(RegionKey)
-);
+IF NOT EXISTS (
+    SELECT 1
+    FROM meta.SchemaVersion
+    WHERE MigrationVersion = N'V1'
+)
+BEGIN
+    INSERT INTO meta.SchemaVersion (MigrationVersion, Description)
+    VALUES (N'V1', N'Canonical brvehins1 foundation bootstrap');
+END;
 GO
-*/
-
--- ----------------------------------------------------------------------------
--- 7. DDL: Fact_Claims
--- ----------------------------------------------------------------------------
--- TODO: Dinh nghia bang Fact_Claims voi Foreign Keys toi cac Dim
-/*
-CREATE TABLE dbo.Fact_Claims (
-    ClaimFactKey BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    CustomerKey INT NOT NULL,
-    PolicyKey INT NOT NULL,
-    DateKey INT NOT NULL,
-    RegionKey INT NOT NULL,
-    -- Measures
-    ClaimAmount DECIMAL(18,2) NOT NULL,
-    ClaimCount INT DEFAULT 1,
-    CreatedDate DATETIME2 DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT FK_Fact_Claims_Customer FOREIGN KEY (CustomerKey) REFERENCES dbo.Dim_Customer(CustomerKey),
-    CONSTRAINT FK_Fact_Claims_Policy FOREIGN KEY (PolicyKey) REFERENCES dbo.Dim_Policy(PolicyKey),
-    CONSTRAINT FK_Fact_Claims_Date FOREIGN KEY (DateKey) REFERENCES dbo.Dim_Date(DateKey),
-    CONSTRAINT FK_Fact_Claims_Region FOREIGN KEY (RegionKey) REFERENCES dbo.Dim_Region(RegionKey)
-);
-GO
-*/
-
--- ----------------------------------------------------------------------------
--- 8. DDL: Fact_Customer_Risk_Prediction (Ket qua Machine Learning)
--- ----------------------------------------------------------------------------
--- TODO: Dinh nghia bang Fact_Customer_Risk_Prediction
-/*
-CREATE TABLE dbo.Fact_Customer_Risk_Prediction (
-    PredictionFactKey BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
-    CustomerKey INT NOT NULL,
-    DateKey INT NOT NULL,
-    -- ML Output Measures & Labels
-    PredictedClaimProbability DECIMAL(6,4) NOT NULL,    -- Xac suat tu 0.0000 den 1.0000
-    RiskCategory NVARCHAR(20) NOT NULL,                 -- 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'
-    ModelVersion NVARCHAR(50) NOT NULL,
-    CreatedDate DATETIME2 DEFAULT SYSUTCDATETIME(),
-    UpdatedDate DATETIME2 DEFAULT SYSUTCDATETIME(),
-    CONSTRAINT FK_Fact_RiskPred_Customer FOREIGN KEY (CustomerKey) REFERENCES dbo.Dim_Customer(CustomerKey),
-    CONSTRAINT FK_Fact_RiskPred_Date FOREIGN KEY (DateKey) REFERENCES dbo.Dim_Date(DateKey)
-);
-GO
-CREATE INDEX IX_Fact_RiskPred_Customer ON dbo.Fact_Customer_Risk_Prediction (CustomerKey, DateKey);
-GO
-*/

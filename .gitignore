@@ -58,3 +58,7 @@ Desktop.ini
 
 # Personal
 roadmap.md
+
+# Personal agent-session history; intentionally local only.
+AGENT_PROMPT_HISTORY.md
+.tmp-dependency-check-*/

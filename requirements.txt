@@ -1,0 +1,6 @@
+# Host Python runtime (verified with Python 3.12.6 on 2026-09-22).
+# EDA/profile scripts: scripts/profile_brvehins1.py and notebook 01-eda.ipynb.
+numpy==2.4.6
+pandas==3.0.3
+# SQL Server staging loader: scripts/load_brvehins1_to_staging.py.
+pyodbc==5.3.0

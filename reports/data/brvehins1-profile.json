@@ -1,0 +1,906 @@
+{
+  "run_metadata": {
+    "source_directory": "data/raw/brvehins1",
+    "chunk_size": 100000,
+    "elapsed_seconds": 330.018,
+    "method": "pandas streaming chunks; exact duplicate equality through a temporary SQLite primary-key set of all logical source fields; exact quantiles from retained numeric vectors"
+  },
+  "schema": {
+    "column_count": 23,
+    "columns": [
+      "Gender",
+      "DrivAge",
+      "VehYear",
+      "VehModel",
+      "VehGroup",
+      "Area",
+      "State",
+      "StateAb",
+      "ExposTotal",
+      "ExposFireRob",
+      "PremTotal",
+      "PremFireRob",
+      "SumInsAvg",
+      "ClaimNbRob",
+      "ClaimNbPartColl",
+      "ClaimNbTotColl",
+      "ClaimNbFire",
+      "ClaimNbOther",
+      "ClaimAmountRob",
+      "ClaimAmountPartColl",
+      "ClaimAmountTotColl",
+      "ClaimAmountFire",
+      "ClaimAmountOther"
+    ],
+    "physical_dtypes_by_column": {
+      "Gender": [
+        "str"
+      ],
+      "DrivAge": [
+        "str"
+      ],
+      "VehYear": [
+        "float64",
+        "int64"
+      ],
+      "VehModel": [
+        "str"
+      ],
+      "VehGroup": [
+        "str"
+      ],
+      "Area": [
+        "str"
+      ],
+      "State": [
+        "str"
+      ],
+      "StateAb": [
+        "str"
+      ],
+      "ExposTotal": [
+        "float64"
+      ],
+      "ExposFireRob": [
+        "int64"
+      ],
+      "PremTotal": [
+        "float64"
+      ],
+      "PremFireRob": [
+        "int64"
+      ],
+      "SumInsAvg": [
+        "float64"
+      ],
+      "ClaimNbRob": [
+        "int64"
+      ],
+      "ClaimNbPartColl": [
+        "int64"
+      ],
+      "ClaimNbTotColl": [
+        "int64"
+      ],
+      "ClaimNbFire": [
+        "int64"
+      ],
+      "ClaimNbOther": [
+        "int64"
+      ],
+      "ClaimAmountRob": [
+        "float64",
+        "int64"
+      ],
+      "ClaimAmountPartColl": [
+        "int64"
+      ],
+      "ClaimAmountTotColl": [
+        "float64",
+        "int64"
+      ],
+      "ClaimAmountFire": [
+        "int64"
+      ],
+      "ClaimAmountOther": [
+        "int64"
+      ]
+    },
+    "partition_schema_compatible": true
+  },
+  "partitions": [
+    {
+      "file": "brvehins1a.csv",
+      "bytes": 60499054,
+      "rows": 393071,
+      "exact_duplicates_encountered": 0
+    },
+    {
+      "file": "brvehins1b.csv",
+      "bytes": 60497433,
+      "rows": 393071,
+      "exact_duplicates_encountered": 4
+    },
+    {
+      "file": "brvehins1c.csv",
+      "bytes": 60481086,
+      "rows": 393071,
+      "exact_duplicates_encountered": 2
+    },
+    {
+      "file": "brvehins1d.csv",
+      "bytes": 60491192,
+      "rows": 393071,
+      "exact_duplicates_encountered": 2
+    },
+    {
+      "file": "brvehins1e.csv",
+      "bytes": 60501172,
+      "rows": 393071,
+      "exact_duplicates_encountered": 6
+    }
+  ],
+  "total_rows": 1965355,
+  "missing_counts": {
+    "Gender": 88189,
+    "DrivAge": 284948,
+    "VehYear": 4,
+    "VehModel": 120515,
+    "VehGroup": 120515,
+    "Area": 13,
+    "State": 13,
+    "StateAb": 13,
+    "ExposTotal": 0,
+    "ExposFireRob": 0,
+    "PremTotal": 0,
+    "PremFireRob": 0,
+    "SumInsAvg": 0,
+    "ClaimNbRob": 0,
+    "ClaimNbPartColl": 0,
+    "ClaimNbTotColl": 0,
+    "ClaimNbFire": 0,
+    "ClaimNbOther": 0,
+    "ClaimAmountRob": 0,
+    "ClaimAmountPartColl": 0,
+    "ClaimAmountTotColl": 0,
+    "ClaimAmountFire": 0,
+    "ClaimAmountOther": 0
+  },
+  "missing_percentages": {
+    "Gender": 4.487179161016712,
+    "DrivAge": 14.498551152336347,
+    "VehYear": 0.00020352557171605132,
+    "VehModel": 6.131971068839981,
+    "VehGroup": 6.131971068839981,
+    "Area": 0.0006614581080771668,
+    "State": 0.0006614581080771668,
+    "StateAb": 0.0006614581080771668,
+    "ExposTotal": 0.0,
+    "ExposFireRob": 0.0,
+    "PremTotal": 0.0,
+    "PremFireRob": 0.0,
+    "SumInsAvg": 0.0,
+    "ClaimNbRob": 0.0,
+    "ClaimNbPartColl": 0.0,
+    "ClaimNbTotColl": 0.0,
+    "ClaimNbFire": 0.0,
+    "ClaimNbOther": 0.0,
+    "ClaimAmountRob": 0.0,
+    "ClaimAmountPartColl": 0.0,
+    "ClaimAmountTotColl": 0.0,
+    "ClaimAmountFire": 0.0,
+    "ClaimAmountOther": 0.0
+  },
+  "numeric_profile": {
+    "VehYear": {
+      "rows_seen": 1965355,
+      "valid_count": 1965351,
+      "missing_or_nonfinite_count": 4,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 8,
+      "min": 0.0,
+      "max": 2012.0,
+      "mean": 2005.17852688909,
+      "quantiles": {
+        "p01": 1987.0,
+        "p05": 1995.0,
+        "p25": 2003.0,
+        "p50": 2007.0,
+        "p75": 2009.0,
+        "p95": 2011.0,
+        "p99": 2011.0
+      }
+    },
+    "ExposTotal": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 51762,
+      "min": 0.0,
+      "max": 8078.44,
+      "mean": 3.185361211643537,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.04,
+        "p25": 0.4,
+        "p50": 0.53,
+        "p75": 1.81,
+        "p95": 11.79,
+        "p99": 44.27
+      }
+    },
+    "ExposFireRob": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1965355,
+      "min": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      }
+    },
+    "PremTotal": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 51762,
+      "min": 0.0,
+      "max": 6478755.13,
+      "mean": 3730.594227093702,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 25.33,
+        "p25": 340.5,
+        "p50": 887.82,
+        "p75": 2494.9,
+        "p95": 13667.550999999987,
+        "p99": 48589.0173999999
+      }
+    },
+    "PremFireRob": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1965355,
+      "min": 0.0,
+      "max": 0.0,
+      "mean": 0.0,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      }
+    },
+    "SumInsAvg": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 140667,
+      "min": 0.0,
+      "max": 1307269.94,
+      "mean": 39413.43832743702,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 18556.21,
+        "p50": 29810.53,
+        "p75": 48177.06,
+        "p95": 107289.3049999998,
+        "p99": 197153.47899999982
+      }
+    },
+    "ClaimNbRob": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1923094,
+      "min": 0.0,
+      "max": 164.0,
+      "mean": 0.030163507356177382,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 1.0
+      }
+    },
+    "ClaimNbPartColl": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1749216,
+      "min": 0.0,
+      "max": 1617.0,
+      "mean": 0.22397073302278722,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 1.0,
+        "p99": 4.0
+      }
+    },
+    "ClaimNbTotColl": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1932654,
+      "min": 0.0,
+      "max": 66.0,
+      "mean": 0.018497930399342614,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 1.0
+      }
+    },
+    "ClaimNbFire": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1963815,
+      "min": 0.0,
+      "max": 6.0,
+      "mean": 0.0008191904261571065,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      }
+    },
+    "ClaimNbOther": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1775601,
+      "min": 0.0,
+      "max": 1278.0,
+      "mean": 0.4820665986552048,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 2.0,
+        "p99": 8.0
+      }
+    },
+    "ClaimAmountRob": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1923094,
+      "min": 0.0,
+      "max": 4421765.0,
+      "mean": 745.7559367137235,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 26685.0
+      }
+    },
+    "ClaimAmountPartColl": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1749216,
+      "min": 0.0,
+      "max": 2289213.0,
+      "mean": 837.1295374118162,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 4148.0,
+        "p99": 17244.0
+      }
+    },
+    "ClaimAmountTotColl": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1932654,
+      "min": 0.0,
+      "max": 2201873.0,
+      "mean": 615.1462611080441,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 25024.0
+      }
+    },
+    "ClaimAmountFire": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1963815,
+      "min": 0.0,
+      "max": 581152.0,
+      "mean": 19.156278636683957,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.0,
+        "p99": 0.0
+      }
+    },
+    "ClaimAmountOther": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1775601,
+      "min": 0.0,
+      "max": 967914.0,
+      "mean": 146.70082504178635,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 217.0,
+        "p99": 1664.0
+      }
+    }
+  },
+  "categorical_profile": {
+    "Gender": {
+      "cardinality_excluding_null": 3,
+      "top_values": [
+        {
+          "value": "Male",
+          "count": 857074
+        },
+        {
+          "value": "Female",
+          "count": 644600
+        },
+        {
+          "value": "Corporate",
+          "count": 375492
+        }
+      ]
+    },
+    "DrivAge": {
+      "cardinality_excluding_null": 5,
+      "top_values": [
+        {
+          "value": "36-45",
+          "count": 430278
+        },
+        {
+          "value": "46-55",
+          "count": 396339
+        },
+        {
+          "value": ">55",
+          "count": 384311
+        },
+        {
+          "value": "26-35",
+          "count": 340732
+        },
+        {
+          "value": "18-25",
+          "count": 128747
+        }
+      ]
+    },
+    "VehModel": {
+      "cardinality_excluding_null": 4259,
+      "top_values": [
+        {
+          "value": "Outros",
+          "count": 26176
+        },
+        {
+          "value": "Fiat - Uno Mille 1.0 Fire/ F.flex/ Economy 4p",
+          "count": 8832
+        },
+        {
+          "value": "Fiat - Uno Mille 1.0 Fire/ F.flex/ Economy 2p",
+          "count": 7896
+        },
+        {
+          "value": "Toyota - Corolla Xei 1.8/1.8 Flex 16v Aut.",
+          "count": 7756
+        },
+        {
+          "value": "Ford - Ecosport Xlt 1.6/ 1.6 Flex 8v 5p",
+          "count": 7267
+        },
+        {
+          "value": "Ford - Ecosport Xls 1.6/ 1.6 Flex 8v 5p",
+          "count": 7244
+        },
+        {
+          "value": "Vw - Volkswagen - Gol City (trend) 1.0 Mi Total Flex 8v 4p",
+          "count": 7058
+        },
+        {
+          "value": "Fiat - Palio 1.0/ Trofeo 1.0 Fire/ Fire Flex 4p",
+          "count": 6450
+        },
+        {
+          "value": "Fiat - Siena 1.0/ Ex 1.0 Mpi Fire/ Fire Flex 8v",
+          "count": 6315
+        },
+        {
+          "value": "Toyota - Corolla Xei 1.8/1.8 Flex 16v Mec.",
+          "count": 6094
+        }
+      ]
+    },
+    "VehGroup": {
+      "cardinality_excluding_null": 436,
+      "top_values": [
+        {
+          "value": "Vw Volkswagen Gol 1.0",
+          "count": 51180
+        },
+        {
+          "value": "Fiat Palio 1.0",
+          "count": 48981
+        },
+        {
+          "value": "Gm Chevrolet Corsa 1.0",
+          "count": 42721
+        },
+        {
+          "value": "Mercedes-benz Caminhoes - Outros",
+          "count": 41157
+        },
+        {
+          "value": "Gm Chevrolet S-10",
+          "count": 40882
+        },
+        {
+          "value": "Ford Eco Sport",
+          "count": 38017
+        },
+        {
+          "value": "Fiat Uno 1.0",
+          "count": 37495
+        },
+        {
+          "value": "Peugeot 206",
+          "count": 35415
+        },
+        {
+          "value": "Toyota Corolla",
+          "count": 35367
+        },
+        {
+          "value": "Gm Chevrolet Astra",
+          "count": 33848
+        }
+      ]
+    },
+    "Area": {
+      "cardinality_excluding_null": 40,
+      "top_values": [
+        {
+          "value": "Met. de Sao Paulo",
+          "count": 155942
+        },
+        {
+          "value": "Demais regioes",
+          "count": 147802
+        },
+        {
+          "value": "Ribeirao Preto e Demais Mun. de Campinas",
+          "count": 126142
+        },
+        {
+          "value": "Met. do Rio de Janeiro",
+          "count": 94120
+        },
+        {
+          "value": "Met. Porto Alegre e Caxias do Sul",
+          "count": 89100
+        },
+        {
+          "value": "Met. Curitiba",
+          "count": 88414
+        },
+        {
+          "value": "Met.BH-Centro Oeste-Zona Mata-C. Vertentes",
+          "count": 82911
+        },
+        {
+          "value": "Grande Campinas",
+          "count": 77376
+        },
+        {
+          "value": "Blumenau e demais regioes",
+          "count": 76611
+        },
+        {
+          "value": "Vale do Paraiba e Ribeira",
+          "count": 66105
+        }
+      ]
+    },
+    "State": {
+      "cardinality_excluding_null": 27,
+      "top_values": [
+        {
+          "value": "Sao Paulo",
+          "count": 457773
+        },
+        {
+          "value": "Minas Gerais",
+          "count": 203158
+        },
+        {
+          "value": "Parana",
+          "count": 200452
+        },
+        {
+          "value": "Santa Catarina",
+          "count": 177588
+        },
+        {
+          "value": "Rio Grande do Sul",
+          "count": 167940
+        },
+        {
+          "value": "Rio de Janeiro",
+          "count": 145855
+        },
+        {
+          "value": "Goias",
+          "count": 70331
+        },
+        {
+          "value": "Bahia",
+          "count": 58159
+        },
+        {
+          "value": "Distrito Federal",
+          "count": 56017
+        },
+        {
+          "value": "Pernambuco",
+          "count": 46187
+        }
+      ]
+    },
+    "StateAb": {
+      "cardinality_excluding_null": 27,
+      "top_values": [
+        {
+          "value": "SP",
+          "count": 457773
+        },
+        {
+          "value": "MG",
+          "count": 203158
+        },
+        {
+          "value": "PR",
+          "count": 200452
+        },
+        {
+          "value": "SC",
+          "count": 177588
+        },
+        {
+          "value": "RS",
+          "count": 167940
+        },
+        {
+          "value": "RJ",
+          "count": 145855
+        },
+        {
+          "value": "GO",
+          "count": 70331
+        },
+        {
+          "value": "BA",
+          "count": 58159
+        },
+        {
+          "value": "DF",
+          "count": 56017
+        },
+        {
+          "value": "PE",
+          "count": 46187
+        }
+      ]
+    }
+  },
+  "exact_duplicate_profile": {
+    "combined_exact_duplicate_rows": 14,
+    "combined_distinct_logical_rows": 1965341,
+    "duplicate_policy_assessment": "Không tự deduplicate. SourceFile + SourceRowNumber sẽ là nhận diện kỹ thuật để giữ nguyên mọi bản ghi nguồn, kể cả khi có dòng logic trùng."
+  },
+  "derived_metric_profile": {
+    "TotalClaimCount": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1602279,
+      "min": 0.0,
+      "max": 1637.0,
+      "mean": 0.7555179598596691,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 3.0,
+        "p99": 12.0
+      }
+    },
+    "TotalClaimAmount": {
+      "rows_seen": 1965355,
+      "valid_count": 1965355,
+      "missing_or_nonfinite_count": 0,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1602279,
+      "min": 0.0,
+      "max": 8273940.0,
+      "mean": 2363.888838912054,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 9347.0,
+        "p99": 53278.0
+      }
+    },
+    "ClaimFrequency": {
+      "rows_seen": 1965355,
+      "valid_count": 1913593,
+      "missing_or_nonfinite_count": 51762,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1602279,
+      "min": 0.0,
+      "max": 13504.999641541272,
+      "mean": 0.3104865498417093,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 0.8810572687224669,
+        "p99": 4.0
+      }
+    },
+    "LossRatio": {
+      "rows_seen": 1965355,
+      "valid_count": 1913593,
+      "missing_or_nonfinite_count": 51762,
+      "conversion_error_count": 0,
+      "negative_count": 0,
+      "zero_count": 1602279,
+      "min": 0.0,
+      "max": 87960930222080.02,
+      "mean": 45966395.41978781,
+      "quantiles": {
+        "p01": 0.0,
+        "p05": 0.0,
+        "p25": 0.0,
+        "p50": 0.0,
+        "p75": 0.0,
+        "p95": 1.3395719712180794,
+        "p99": 14.891820257565948
+      }
+    },
+    "HasClaim": {
+      "missing": 0,
+      "yes": 363076,
+      "no": 1602279
+    },
+    "formulas": {
+      "TotalClaimCount": "Tổng năm cột ClaimNb*.",
+      "TotalClaimAmount": "Tổng năm cột ClaimAmount*.",
+      "HasClaim": "TotalClaimCount > 0 khi toàn bộ ClaimNb* có giá trị.",
+      "ClaimFrequency": "TotalClaimCount / ExposTotal khi ExposTotal > 0.",
+      "LossRatio": "TotalClaimAmount / PremTotal khi PremTotal > 0."
+    }
+  },
+  "state_abbreviation_consistency": {
+    "rows_with_state_pair": 1965342,
+    "state_to_abbreviation_conflicts": {},
+    "abbreviation_to_state_conflicts": {}
+  },
+  "cross_field_observations": {
+    "rows_with_state": 1965342,
+    "rows_with_state_ab": 1965342,
+    "rows_with_state_pair": 1965342,
+    "zero_or_negative_exposure": 51762,
+    "zero_or_negative_premium": 51762,
+    "amount_positive_count_zero": 0,
+    "count_positive_amount_zero": 0,
+    "fire_rob_exposure_exceeds_total": 0,
+    "fire_rob_premium_exceeds_total": 0
+  },
+  "grain_assessment": {
+    "assessment": "Mỗi dòng là một quan sát tổng hợp về exposure, premium và claim cho một tổ hợp thuộc tính người lái, xe và địa lý; nguồn không cung cấp mã business identifier rõ ràng.",
+    "natural_policy_identifier": "Không quan sát thấy trong 23 cột nguồn.",
+    "natural_customer_identifier": "Không quan sát thấy trong 23 cột nguồn.",
+    "technical_identity": "SourceFile + SourceRowNumber; SourceRecordHash chỉ là fingerprint nội dung."
+  }
+}

@@ -19,6 +19,15 @@
 --   - Chay lai nhieu lan cung mot batch khong lam thay doi du lieu
 -- ============================================================================
 
+/*
+STALE SCAFFOLD — REQUIRES REFACTOR.
+
+The historical commented examples below assume SUSEP/Porto policy, date and
+region entities. They are intentionally retained as history only and are not
+executed. The executable canonical entry point is
+`sql/04_load_canonical_dimensions.sql`.
+*/
+
 USE DWH_Insurance;
 GO
 
@@ -126,6 +135,7 @@ END
 GO
 */
 
+
 -- ----------------------------------------------------------------------------
 -- 3. Stored Procedure: sp_Load_DimDate
 -- ----------------------------------------------------------------------------
@@ -193,4 +203,3 @@ BEGIN
 END
 GO
 */
-

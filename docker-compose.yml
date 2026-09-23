@@ -1,50 +1,30 @@
-# Docker Compose configuration for Insurance DWH & Performance Tuning
-# Architecture: Microsoft SQL Server 2022 + Apache Airflow (Webserver & Scheduler)
-#
-# Hardware Recommendation:
-# - Minimum RAM: >= 6GB total allocated to Docker/WSL2 for running both SQL Server and Airflow smoothly
-# - Recommended: 8GB+ RAM for handling high volume data processing and CDC workloads
-
 services:
-  # ---------------------------------------------------------------------------
-  # Microsoft SQL Server 2022 Service
-  # ---------------------------------------------------------------------------
   sqlserver:
     image: mcr.microsoft.com/mssql/server:2022-latest
     container_name: insurance_sqlserver
-    restart: always
+    restart: unless-stopped
     environment:
-      - ACCEPT_EULA=Y
-      - SA_PASSWORD=YourStrong!Passw0rd_Placeholder
-      - MSSQL_PID=Developer
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: Developer
+      MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?Set SQLSERVER_SA_PASSWORD in the ignored .env file or process environment.}
     ports:
       - "1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
       - ./data/raw:/var/opt/mssql/raw_data:ro
-    # Resource reservation/limits recommendation (>= 2GB for SQL Server)
-    deploy:
-      resources:
-        limits:
-          memory: 4096M
-        reservations:
-          memory: 2048M
 
-  # ---------------------------------------------------------------------------
-  # Apache Airflow Service (Webserver & Scheduler)
-  # ---------------------------------------------------------------------------
   airflow:
+    profiles: ["orchestration"]
     image: apache/airflow:2.8.1-python3.10
     container_name: insurance_airflow
-    restart: always
+    restart: unless-stopped
     depends_on:
       - sqlserver
     environment:
-      - AIRFLOW__CORE__LOAD_EXAMPLES=False
-      - AIRFLOW__CORE__EXECUTOR=SequentialExecutor
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=sqlite:////opt/airflow/airflow.db
-      - AIRFLOW__WEBSERVER__SECRET_KEY=temporary_secret_key_placeholder
-      # TODO: Configure production connection string to SQL Server or dedicated Postgres metadata DB in future phases
+      AIRFLOW__CORE__LOAD_EXAMPLES: "False"
+      AIRFLOW__CORE__EXECUTOR: SequentialExecutor
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-configure-before-orchestration-runtime}
     ports:
       - "8080:8080"
     volumes:
@@ -52,15 +32,7 @@ services:
       - ./sql:/opt/airflow/sql
       - ./log:/opt/airflow/logs
       - ./data/raw:/opt/airflow/raw_data:ro
-    # `standalone` khoi tao metadata database va chay ca webserver lẫn scheduler
-    # trong mot service Airflow, dung voi thiet ke hai service tong the.
     command: standalone
-    deploy:
-      resources:
-        limits:
-          memory: 2048M
-        reservations:
-          memory: 1024M
 
 volumes:
   sqlserver_data:

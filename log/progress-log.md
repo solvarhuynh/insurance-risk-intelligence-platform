@@ -100,3 +100,112 @@ P1-DATA-01 — Real EDA & Source Data Contract:
 1. Chay phan tich EDA thuc te trong `notebooks/01-eda.ipynb` (hoac script) tren 5 partition `data/raw/brvehins1/` (phan bo exposure, loss ratio, tan suat claim zero-inflation).
 2. Thiet lap Source Data Contract chinh thuc cho `brvehins1` (schema, types, constraints, business domain assumptions).
 3. Len ke hoach refactor staging, migration DDL, SQL stored procedures, ML modules, va Airflow DAG theo data contract moi.
+
+## Cập nhật hiện tại — 2026-09-22
+
+| Thời gian | Giai đoạn | Việc đã làm | File đã tạo/sửa | Đường dẫn | Trạng thái | Ghi chú |
+|---|---|---|---|---|---|---|
+| 2026-09-22 | WF | P1-WF-04: chuẩn hóa nguồn `brvehins1`, tài liệu hiện hành và static validator | README, docs hiện hành, validator, checkpoint | `README.md`; `docs/`; `scripts/validate_repo.py`; `reports/checkpoints/P1-WF-04.md` | DONE | Năm partition tồn tại, mỗi file 393,071 dòng, tổng 1,965,355; header 23 cột đồng nhất; validator đạt 39 PASS, 0 FAIL, 8 SKIPPED runtime scope; raw không đổi. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-DATA-01` là stage kế tiếp. Không có subsystem runtime nào được suy diễn là `RUNTIME_PASS` từ P1-WF-04.
+
+## Việc tiếp theo cần làm
+
+`P1-DATA-01`: thực hiện EDA streaming có bằng chứng về row count, null, duplicate, range, cardinality, phân bố claim/premium/exposure và grain assessment; không sửa raw.
+
+| 2026-09-22 | DATA | P1-DATA-01: EDA streaming và source profiling thực tế | profiler, notebook, JSON/CSV/Markdown evidence, checkpoint | `scripts/profile_brvehins1.py`; `notebooks/01-eda.ipynb`; `reports/data/`; `reports/checkpoints/P1-DATA-01.md` | DONE | 1,965,355 dòng, schema 23 cột đồng nhất, 14 exact duplicate logical rows, `HasClaim` 363,076; raw không đổi; static validator 40 PASS, 0 FAIL; next: P1-DATA-02. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-DATA-02` là stage kế tiếp. EDA có bằng chứng dữ liệu, nhưng chưa có database hoặc pipeline runtime đạt `RUNTIME_PASS`.
+
+## Việc tiếp theo cần làm
+
+`P1-DATA-02`: đóng băng source data contract cho 23 cột, mapping SQL, grain, technical identity, null/duplicate/invalid policy và công thức metric dẫn xuất.
+
+| 2026-09-22 | DATA | P1-DATA-02: đóng băng source data contract | data dictionary, source contract, checkpoint | `docs/architecture/data-dictionary.md`; `docs/architecture/source-data-contract.md`; `reports/checkpoints/P1-DATA-02.md` | DONE | Đủ 23 field, mapping SQL, grain aggregate source row, technical identity `SourceFile + SourceRowNumber`, policy null/duplicate/invalid/ratio; next: P1-INFRA. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-INFRA-01 / P1-INFRA-02` là stage kế tiếp. EDA đã `RUNTIME_PASS`; data contract `DONE`; SQL Server/DWH chưa có bằng chứng runtime.
+
+## Việc tiếp theo cần làm
+
+`P1-INFRA`: dùng environment-based credential, khởi động SQL Server, kiểm tra kết nối, tạo `DWH_Insurance` và metadata foundation có thể rerun an toàn.
+
+| 2026-09-22 | INFRA | P1-INFRA-01 / P1-INFRA-02: runtime SQL Server và bootstrap idempotent | compose, env example, V1 migration, checkpoint | `docker-compose.yml`; `.env.example`; `migrations/V1__create_dwh_schema.sql`; `reports/checkpoints/P1-INFRA.md` | DONE | Docker SQL Server `Up`; sqlcmd kết nối thành công; `DWH_Insurance` có schemas `meta/stg/dwh/dq`, 4 metadata tables, manifest 5 partition và V1 rerun an toàn; không có Customer/Policy legacy. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-INGEST-01` là stage kế tiếp. SQL Server và foundation metadata đã `RUNTIME_PASS`; staging business table chưa tồn tại.
+
+## Việc tiếp theo cần làm
+
+`P1-INGEST-01`: refactor `sql/01_load_staging.sql` thành DDL/loader thực cho 23 cột `brvehins1`, metadata lineage và cơ chế nạp idempotent trước khi nạp partition đầu tiên.
+
+| 2026-09-22 | INGEST | P1-INGEST-01: tạo typed staging canonical | V2 migration, entry point, staging design, checkpoint | `migrations/V2__create_staging_schema.sql`; `sql/01_load_staging.sql`; `docs/architecture/staging-design.md`; `reports/checkpoints/P1-INGEST-01.md` | DONE | `stg.BrVehIns1` và landing table tồn tại; assertion runtime xác minh đủ 23 source column và SQL mapping; transactional smoke test rollback thành công, staging vẫn 0 row; next: nạp partition A. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-INGEST-02` là stage kế tiếp. Typed staging đã `RUNTIME_PASS` về cấu trúc nhưng chưa nạp raw partition nào.
+
+## Việc tiếp theo cần làm
+
+`P1-INGEST-02`: tạo loader chung cho một partition canonical, nạp riêng `brvehins1a.csv`, đối soát 393,071 dòng và chứng minh rerun không duplicate.
+
+| 2026-09-22 | INGEST | P1-INGEST-02: nạp partition A qua streaming client loader | loader Python, migrations precision, precision evidence, checkpoint | `scripts/load_brvehins1_to_staging.py`; `migrations/V4__remove_unsupported_bulk_landing.sql`; `migrations/V5__preserve_observed_decimal_precision.sql`; `reports/data/brvehins1-numeric-precision.json`; `reports/checkpoints/P1-INGEST-02.md` | DONE | A SUCCESS batch `56D062D8-5048-4086-A6A0-0F26E17FD6B3`: source=staging=393,071, rejected=0, 50,047 ms; rerun SKIPPED không duplicate. Raw lexical scan sửa mapping `ExposTotal` thành DECIMAL(21,17), `PremTotal` thành DECIMAL(34,27), không làm tròn source. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-INGEST-03` là stage kế tiếp. Partition A đã `RUNTIME_PASS`; B–E chưa được nạp.
+
+## Việc tiếp theo cần làm
+
+`P1-INGEST-03`: chạy cùng loader cho B, C, D, E, đối soát năm batch và tổng staging 1,965,355; thử rerun một partition SUCCESS để khẳng định idempotency toàn pipeline ingest.
+
+| 2026-09-22 | INGEST | P1-INGEST-03: nạp B–E và đối soát toàn staging | checkpoint và staging design | `docs/architecture/staging-design.md`; `reports/checkpoints/P1-INGEST-03.md` | DONE | Năm SUCCESS batch, mỗi batch=393,071, rejected=0; staging total=1,965,355 và unique technical identity=1,965,355; rerun E SKIPPED, không duplicate. |
+
+## Giai đoạn hiện tại
+
+Yêu cầu bổ sung — dependency management retrofit cho foundation: audit import, manifest host/dev/Airflow, compatibility/install evidence và cập nhật docs/validator. Không triển khai DWH trước khi yêu cầu này được validate.
+
+## Việc tiếp theo cần làm
+
+Audit import trong `scripts/`, `notebooks/`, `ml/`, `dags/`; tạo `requirements.txt`/`requirements-dev.txt` tối thiểu có lý do, kiểm tra cài đặt trong clean virtual environment và cập nhật README, run guide, repository structure, validator.
+
+| 2026-09-22 | INFRA | P1-INFRA-DEPS: quản lý dependency Python theo boundary host/dev/Airflow | manifests, dependency guide, README/run guide/repository structure, validator, checkpoint | `requirements.txt`; `requirements-dev.txt`; `docs/architecture/python-dependencies.md`; `scripts/validate_repo.py`; `reports/checkpoints/P1-INFRA-DEPS.md` | RUNTIME_PASS | Audit import chứng minh host runtime chỉ cần numpy/pandas/pyodbc; dev thêm PyYAML/JupyterLab; Airflow cô lập trong `apache/airflow:2.8.1-python3.10`. Clean venv Python 3.12.6 cài `requirements-dev.txt` và import toàn bộ package thành công. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-DWH-01` là stage kế tiếp. Dependency host/dev đã `RUNTIME_PASS`; Airflow vẫn chỉ thuộc Docker orchestration scaffold, chưa có bằng chứng runtime.
+
+## Việc tiếp theo cần làm
+
+`P1-DWH-01`: viết `docs/architecture/dwh-design.md` dựa hoàn toàn trên source data contract và staging đã nạp; đóng băng grain Fact và dimension hợp lệ trước khi viết DDL.
+
+| 2026-09-22 | DWH | P1-DWH-01: chốt thiết kế dimensional từ evidence staging | DWH design và checkpoint | `docs/architecture/dwh-design.md`; `reports/checkpoints/P1-DWH-01.md` | DONE | Fact là `FactRiskObservation`, grain một `SourceFile + SourceRowNumber`; chỉ có dimension DriverProfile, Vehicle, Geography. Không Customer/Policy/SCD2/date/claim-event. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-DWH-02` là stage kế tiếp. Thiết kế model đã được chấp thuận; dimensions chưa có DDL hay bằng chứng runtime.
+
+## Việc tiếp theo cần làm
+
+`P1-DWH-02`: tạo migration và loader deterministic cho ba dimensions, rồi kiểm tra runtime row count, uniqueness và rerun an toàn.
+
+| 2026-09-22 | DWH | P1-DWH-02: nạp canonical dimensions từ staging | V6 migration, canonical entry point, DWH docs, checkpoint | `migrations/V6__create_canonical_dimensions.sql`; `sql/04_load_canonical_dimensions.sql`; `docs/architecture/dwh-design.md`; `reports/checkpoints/P1-DWH-02.md` | RUNTIME_PASS | First load: DriverProfile 24, Vehicle 25,092, Geography 42 tuple; mỗi table có thêm default key 0. Rerun chèn 0 row; natural hash unique. |
+
+## Giai đoạn hiện tại
+
+Foundation milestone — `P1-DWH-03` là stage kế tiếp. Ba dimension đã `RUNTIME_PASS`; fact chưa tồn tại.
+
+## Việc tiếp theo cần làm
+
+`P1-DWH-03`: tạo `FactRiskObservation`, nạp one-to-one từ staging, kiểm tra FK và reconciliation staging-to-fact, rồi chứng minh rerun an toàn.
+
+| 2026-09-22 | DWH | P1-DWH-03: nạp canonical fact | V7 migration, fact entry point, checkpoint | `migrations/V7__create_fact_risk_observation.sql`; `sql/05_load_fact_risk_observation.sql`; `reports/checkpoints/P1-DWH-03.md` | RUNTIME_PASS | Fact = staging = 1,965,355; orphan FK 0; rerun thêm 0 row. |
+| 2026-09-22 | DQ | P1-DQ-01/02/03: executable quality gate và controlled failure | V8 migration, DQ entry point, checkpoints | `migrations/V8__create_data_quality_gate.sql`; `sql/07_run_quality_gate.sql`; `reports/checkpoints/P1-DQ-01.md`; `reports/checkpoints/P1-DQ-02.md`; `reports/checkpoints/P1-DQ-03.md` | RUNTIME_PASS | Production hard rules PASS; controlled invalid input ghi FAIL và SQL error 51040, không đổi dữ liệu; production rerun PASS. |
+
+| 2026-09-22 | FOUNDATION | P1-AUTO-FOUNDATION-01 hoàn tất | final report, toàn bộ checkpoint | `reports/foundation-50pct-report.md`; `reports/checkpoints/` | DONE | Final validation: 55 PASS, 0 FAIL, 8 runtime-scope SKIPPED; SQL Server, staging, DWH và DQ có runtime evidence. Không triển khai CDC/ML/Airflow/Performance/BI. |

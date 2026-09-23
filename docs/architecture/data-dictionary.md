@@ -1,90 +1,76 @@
-# Data Dictionary — Từ điển Dữ liệu Nguồn và Đích
-# Data Dictionary — Từ điển Dữ liệu Nguồn và Đích (brvehins1)
+# Từ điển dữ liệu nguồn chuẩn — brvehins1
 
-Trạng thái: Khung cấu trúc từ điển dữ liệu. Hai bộ dữ liệu gốc (SUSEP ~8.3M dòng và Porto Seguro ~1.5M dòng) sẽ được tải vào `data/raw/` trong Giai đoạn 1 để điền đầy đủ thông tin chi tiết qua notebook `notebooks/01-eda.ipynb`.
-Tài liệu này định nghĩa từ điển dữ liệu chính thức cho nguồn dữ liệu canonical của dự án: **brvehins1** (gồm 5 phân đoạn `brvehins1[a-e].csv` trong `data/raw/brvehins1/`, tổng cộng 1.965.355 dòng, 23 cột).
+Trạng thái: `DONE` cho source data contract `P1-DATA-02`. Bằng chứng profile nằm tại `reports/data/brvehins1-profile.json`, `reports/data/brvehins1-column-profile.csv` và `reports/data/brvehins1-eda-summary.md`.
 
-## 1. Nguồn dữ liệu: SUSEP — Brazilian Insurance Market Data (~8.3M dòng)
-> Quyết định kiến trúc dữ liệu:
-> - Nguồn dữ liệu canonical duy nhất của dự án là `brvehins1`. Cả 5 phân đoạn có cùng schema 23 cột.
-> - Nguồn dữ liệu cũ `data/raw/susep.gov.br/insurance_dataset.csv` được giữ lại dưới dạng **LEGACY / NON-CANONICAL** nhằm bảo toàn lịch sử nghiên cứu, không thuộc luồng dữ liệu xử lý canonical.
-> - Tập dữ liệu thô `brvehins1` KHÔNG có các trường như `CustomerId`, `PolicyNumber`, ngày giao dịch cụ thể, hay ngày bắt đầu/kết thúc lịch sử khách hàng (`Start_Date`, `End_Date`). Mô hình kho dữ liệu sẽ không tự bịa đặt các trường này mà sẽ mô hình hóa xoay quanh các thực thể tự nhiên có trong dữ liệu: Người lái (Driver Profile), Phương tiện (Vehicle), Địa lý (Geography), Phơi nhiễm (Exposure), Phí bảo hiểm (Premium) và Bồi thường tổn thất (Claims).
-> - Bảng dưới đây khảo sát các cột nguồn thực tế và phân loại sơ bộ; cấu trúc DWH chính thức sẽ được chốt sau khi hoàn thành task EDA (`P1-DATA-01`).
+## Phạm vi
 
-| Tên cột mẫu | Kiểu dữ liệu | Ý nghĩa | Bảng nguồn | Ghi chú chất lượng dữ liệu |
-|---|---|---|---|---|
-| id_empresa / company_id | INT / NVARCHAR | Mã công ty bảo hiểm | Báo cáo tháng SUSEP | Kiểm tra mã hoá và bảng danh mục công ty |
-| id_ramo / product_code | INT / NVARCHAR | Nhóm nghiệp vụ bảo hiểm | Báo cáo tháng SUSEP | Phân loại theo bảo hiểm tài sản, con người, xe |
-| id_regiao / region_code | NVARCHAR(10) | Mã bang / khu vực Brazil | Báo cáo tháng SUSEP | Chuẩn hoá mã bang (SP, RJ, MG, etc.) |
-| dt_ref / date_ref | DATE | Tháng năm ghi nhận giao dịch | Báo cáo tháng SUSEP | Định dạng ngày tháng, kiểm tra khoảng thời gian từ 2003 |
-| vl_premio / premium_amt | DECIMAL(18,2) | Doanh thu phí bảo hiểm phát sinh | Báo cáo tháng SUSEP | Đơn vị BRL, kiểm tra giá trị không âm |
-| vl_sinistro / claims_amt | DECIMAL(18,2) | Giá trị bồi thường phát sinh | Báo cáo tháng SUSEP | Đơn vị BRL, kiểm tra giá trị không âm |
----
+Contract này áp dụng duy nhất cho năm partition `data/raw/brvehins1/brvehins1[a-e].csv`, gồm 1,965,355 dòng và 23 cột. `data/raw/susep.gov.br/insurance_dataset.csv` là **LEGACY / NON-CANONICAL**, nằm ngoài dictionary và pipeline này.
 
-## 2. Nguồn dữ liệu: Porto Seguro's Safe Driver Prediction (~1.5M dòng)
-## 1. Chi tiết 23 cột dữ liệu nguồn canonical (brvehins1)
+Kiểu physical dưới đây là dtype quan sát qua pandas streaming. Kiểu SQL là mapping chuẩn để staging và DWH giữ được giá trị nguồn; chúng không làm phát sinh business identifier.
 
-| Nhóm cột | Kiểu dữ liệu | Ý nghĩa | Vai trò trong DWH / ML |
-|---|---|---|---|
-| id | INT | Mã định danh khách hàng / hợp đồng | Khóa nghiệp vụ (Business Key) cho Dim_Customer |
-| target | INT (0/1) | Khách hàng có phát sinh bồi thường hay không | Biến mục tiêu (Target Label) cho mô hình Machine Learning |
-| ps_ind_* | INT / FLOAT | Đặc trưng nhân khẩu học cá nhân (tuổi, giới tính, khu vực) | Thuộc tính cho Dim_Customer và Feature cho ML |
-| ps_reg_* | FLOAT | Đặc trưng khu vực địa lý nơi đăng ký bảo hiểm | Thuộc tính phân nhóm vùng rủi ro |
-| ps_car_* | INT / FLOAT | Đặc trưng phương tiện xe cơ giới (loại xe, độ tuổi xe) | Thuộc tính hợp đồng/phương tiện |
-| ps_calc_* | FLOAT | Các chỉ số rủi ro tính toán nội bộ | Feature đầu vào cho mô hình dự đoán |
-| STT | Tên cột nguồn (Source Column) | Nhóm nguồn (Source Group) | Kiểu dữ liệu thực tế (Physical Observed) | Kiểu logic đề xuất (Proposed Logical) | Đề xuất vai trò (Current Use Candidate) | Ý nghĩa nghiệp vụ & Ghi chú |
+## Bổ sung precision từ raw lexical scan
+
+Pandas `float64` không cho biết đầy đủ số chữ số thập phân trong text CSV. Khi nạp partition A ở `P1-INGEST-02`, một giá trị `ExposTotal` ở source row 35 có `0.00547945220023394`, nên `DECIMAL(19,6)` sẽ làm mất precision. Scanner streaming độc lập tại `reports/data/brvehins1-numeric-precision.json` đã đọc lại 1,965,355 dòng bằng `Decimal` và xác nhận:
+
+- `ExposTotal` cần tối thiểu `DECIMAL(21,17)` (4 chữ số phần nguyên, 17 chữ số phần thập phân).
+- `PremTotal` cần tối thiểu `DECIMAL(34,27)` (7 chữ số phần nguyên, 27 chữ số phần thập phân); ví dụ raw có `4.54747350886464e-13`.
+- Các decimal measure còn lại không vượt precision của `DECIMAL(19,6)` trong snapshot này; các claim amount raw là số nguyên.
+
+Đây là điều chỉnh contract dựa trên raw lexical evidence, không phải làm tròn hoặc cap source value.
+
+## Nhóm DRIVER và VEHICLE
+
+| Cột nguồn | Nhóm | Physical quan sát | SQL logical | Nullable | Ý nghĩa có bằng chứng | Validation / intended use |
 |---|---|---|---|---|---|---|
-| 1 | `Gender` | DRIVER | string ('Female', 'Male', 'Corporate', nan) | VARCHAR(20) | DIMENSION CANDIDATE | Giới tính của người lái xe hoặc chính sách doanh nghiệp/tổ chức |
-| 2 | `DrivAge` | DRIVER | string ('>55', '36-45', '18-25', '26-35', '46-55', nan) | VARCHAR(10) | DIMENSION CANDIDATE, ML CANDIDATE | Nhóm độ tuổi của người lái xe chính |
-| 3 | `VehYear` | VEHICLE | int64 (1997, 2008, 2010, ...) | SMALLINT | DIMENSION CANDIDATE, ML CANDIDATE | Năm sản xuất / đời xe |
-| 4 | `VehModel` | VEHICLE | string (tên hãng, dòng xe, thông số) | NVARCHAR(150) | DIMENSION CANDIDATE | Nhãn hiệu và model xe chi tiết |
-| 5 | `VehGroup` | VEHICLE | string (tên nhóm dòng xe tổng hợp) | NVARCHAR(100) | DIMENSION CANDIDATE, ML CANDIDATE | Nhóm dòng xe chuẩn hóa |
-| 6 | `Area` | GEOGRAPHY | string ('Interior', 'Met. Porto Alegre...', ...) | NVARCHAR(100) | DIMENSION CANDIDATE, ML CANDIDATE | Khu vực vận hành (vùng đô thị, nội địa, tiểu vùng) |
-| 7 | `State` | GEOGRAPHY | string ('Rio de Janeiro', 'Sao Paulo', ...) | NVARCHAR(50) | DIMENSION CANDIDATE | Tên đầy đủ của bang tại Brazil (27 bang/đơn vị liên bang) |
-| 8 | `StateAb` | GEOGRAPHY | string (2 ký tự: 'RJ', 'SP', 'RS', ...) | CHAR(2) | DIMENSION CANDIDATE, ML CANDIDATE | Mã viết tắt bưu chính của bang tại Brazil |
-| 9 | `ExposTotal` | EXPOSURE | float64 (1.01, 3.0, 4.55, ...) | DECIMAL(6,4) | FACT MEASURE, ML CANDIDATE | Tổng thời gian phơi nhiễm rủi ro tính theo xe-năm (car-years) |
-| 10 | `ExposFireRob` | EXPOSURE | int64 / float64 | DECIMAL(6,4) | FACT MEASURE, REQUIRES REVIEW | Thời gian phơi nhiễm riêng cho rủi ro cháy và cướp xe |
-| 11 | `PremTotal` | PREMIUM | float64 (742.75, 5025.68, ...) | DECIMAL(12,2) | FACT MEASURE | Tổng doanh thu phí bảo hiểm đã thu (đơn vị BRL) |
-| 12 | `PremFireRob` | PREMIUM | int64 / float64 | DECIMAL(12,2) | FACT MEASURE, REQUIRES REVIEW | Phí bảo hiểm thu riêng cho rủi ro cháy và cướp xe (BRL) |
-| 13 | `SumInsAvg` | SUM_INSURED | float64 (10852.99, 301889.74, ...) | DECIMAL(14,2) | FACT MEASURE, ML CANDIDATE | Giá trị bảo hiểm trung bình / giá trị ước tính của xe (BRL) |
-| 14 | `ClaimNbRob` | CLAIM_COUNT | int64 (0, 1, 2, ...) | INT | FACT MEASURE, TARGET/LEAKAGE | Số vụ bồi thường do cướp xe (Robbery) |
-| 15 | `ClaimNbPartColl` | CLAIM_COUNT | int64 (0, 1, 2, ...) | INT | FACT MEASURE, TARGET/LEAKAGE | Số vụ bồi thường do va chạm một phần (Partial Collision) |
-| 16 | `ClaimNbTotColl` | CLAIM_COUNT | int64 (0, 1, 2, ...) | INT | FACT MEASURE, TARGET/LEAKAGE | Số vụ bồi thường do va chạm toàn bộ / tổn thất toàn bộ (Total Collision) |
-| 17 | `ClaimNbFire` | CLAIM_COUNT | int64 (0, 1, 2, ...) | INT | FACT MEASURE, TARGET/LEAKAGE | Số vụ bồi thường do hỏa hoạn (Fire) |
-| 18 | `ClaimNbOther` | CLAIM_COUNT | int64 (0, 1, 2, ...) | INT | FACT MEASURE, TARGET/LEAKAGE | Số vụ bồi thường do các nguyên nhân khác (Other) |
-| 19 | `ClaimAmountRob` | CLAIM_AMOUNT | int64 / float64 | DECIMAL(14,2) | FACT MEASURE, TARGET/LEAKAGE | Số tiền chi trả bồi thường do cướp xe (BRL) |
-| 20 | `ClaimAmountPartColl` | CLAIM_AMOUNT | int64 / float64 | DECIMAL(14,2) | FACT MEASURE, TARGET/LEAKAGE | Số tiền chi trả bồi thường do va chạm một phần (BRL) |
-| 21 | `ClaimAmountTotColl` | CLAIM_AMOUNT | int64 / float64 | DECIMAL(14,2) | FACT MEASURE, TARGET/LEAKAGE | Số tiền chi trả bồi thường do va chạm toàn bộ (BRL) |
-| 22 | `ClaimAmountFire` | CLAIM_AMOUNT | int64 / float64 | DECIMAL(14,2) | FACT MEASURE, TARGET/LEAKAGE | Số tiền chi trả bồi thường do hỏa hoạn (BRL) |
-| 23 | `ClaimAmountOther` | CLAIM_AMOUNT | int64 / float64 | DECIMAL(14,2) | FACT MEASURE, TARGET/LEAKAGE | Số tiền chi trả bồi thường do các nguyên nhân khác (BRL) |
+| `Gender` | DRIVER | `str` | `NVARCHAR(20)` | Có | Nhãn category nguồn; có cả giá trị `Corporate`, nên không thể coi đơn giản là giới tính cá nhân. | Preserve NULL; cardinality 3 khi không null; dimension attribute; ML `PRE_OUTCOME_FEATURE` có điều kiện timing. |
+| `DrivAge` | DRIVER | `str` | `NVARCHAR(20)` | Có | Nhóm tuổi dạng text, không phải tuổi số liên tục. | Preserve NULL; cardinality 5 khi không null; dimension attribute; ML `PRE_OUTCOME_FEATURE` có điều kiện timing. |
+| `VehYear` | VEHICLE | `int64`/`float64` | `SMALLINT` | Có | Giá trị năm/mã năm xe theo nguồn; có 4 NULL và 8 giá trị 0. | Không âm khi có giá trị; `0` là `SUSPICIOUS`/business review, không bị thay đổi; dimension attribute; ML `PRE_OUTCOME_FEATURE` có điều kiện timing. |
+| `VehModel` | VEHICLE | `str` | `NVARCHAR(255)` | Có | Nhãn model xe do nguồn cung cấp. | Preserve NULL; cardinality 4,259 khi không null; dimension attribute; ML `PRE_OUTCOME_FEATURE` có điều kiện timing. |
+| `VehGroup` | VEHICLE | `str` | `NVARCHAR(255)` | Có | Nhãn nhóm xe do nguồn cung cấp. | Preserve NULL; cardinality 436 khi không null; dimension attribute; ML `PRE_OUTCOME_FEATURE` có điều kiện timing. |
 
-## 3. Bảng đích DWH: Fact_Customer_Risk_Prediction (Kết quả Machine Learning)
----
+## Nhóm GEOGRAPHY
 
-| Tên cột | Kiểu dữ liệu | Ràng buộc | Ý nghĩa |
+| Cột nguồn | Nhóm | Physical quan sát | SQL logical | Nullable | Ý nghĩa có bằng chứng | Validation / intended use |
+|---|---|---|---|---|---|---|
+| `Area` | GEOGRAPHY | `str` | `NVARCHAR(100)` | Có | Nhãn khu vực do nguồn cung cấp. | Preserve NULL; cardinality 40 khi không null; geography dimension attribute; ML `PRE_OUTCOME_FEATURE` có điều kiện timing. |
+| `State` | GEOGRAPHY | `str` | `NVARCHAR(100)` | Có | Tên bang/khu vực địa lý theo nguồn. | Preserve NULL; cardinality 27 khi không null; phải nhất quán với `StateAb` khi cả hai có giá trị. |
+| `StateAb` | GEOGRAPHY | `str` | `CHAR(2)` | Có | Viết tắt bang/khu vực theo nguồn. | Preserve NULL; cardinality 27 khi không null; mapping hai chiều với `State` không có mâu thuẫn trong snapshot. |
+
+## Nhóm EXPOSURE, PREMIUM và SUM_INSURED
+
+| Cột nguồn | Nhóm | Physical quan sát | SQL logical | Nullable | Ý nghĩa có bằng chứng | Validation / intended use |
+|---|---|---|---|---|---|---|
+| `ExposTotal` | EXPOSURE | `float64` | `DECIMAL(21,17)` | Không | Measure exposure tổng theo nhãn nguồn. | Hữu hạn và không âm; lexical raw scale tối đa 17 được preserve; 51,762 giá trị 0 được giữ lại; `REQUIRES_REVIEW` cho ML vì timing chưa được chứng minh. |
+| `ExposFireRob` | EXPOSURE | `int64` | `DECIMAL(19,6)` | Không | Measure exposure cho nhóm field fire/rob theo nhãn nguồn. | Hữu hạn và không âm; toàn bộ snapshot bằng 0, là source characteristic cần review chứ không bị xóa. |
+| `PremTotal` | PREMIUM | `float64` | `DECIMAL(34,27)` | Không | Premium tổng theo nhãn nguồn. | Hữu hạn và không âm; lexical raw scale tối đa 27 được preserve; 51,762 giá trị 0 được giữ lại; `REQUIRES_REVIEW` cho ML vì có thể đồng thời với outcome. |
+| `PremFireRob` | PREMIUM | `int64` | `DECIMAL(19,6)` | Không | Premium cho nhóm field fire/rob theo nhãn nguồn. | Hữu hạn và không âm; toàn bộ snapshot bằng 0, là source characteristic cần review. |
+| `SumInsAvg` | SUM_INSURED | `float64` | `DECIMAL(19,6)` | Không | Giá trị insured average theo nhãn nguồn. | Hữu hạn và không âm; 140,667 giá trị 0 được giữ lại; `REQUIRES_REVIEW` cho ML vì timing chưa được chứng minh. |
+
+## Nhóm CLAIM_COUNT và CLAIM_AMOUNT
+
+| Cột nguồn | Nhóm | Physical quan sát | SQL logical | Nullable | Ý nghĩa có bằng chứng | Validation / intended use |
+|---|---|---|---|---|---|---|
+| `ClaimNbRob` | CLAIM_COUNT | `int64` | `INT` | Không | Số claim cho category `Rob` theo nhãn nguồn. | Integer, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimNbPartColl` | CLAIM_COUNT | `int64` | `INT` | Không | Số claim cho category `PartColl` theo nhãn nguồn. | Integer, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimNbTotColl` | CLAIM_COUNT | `int64` | `INT` | Không | Số claim cho category `TotColl` theo nhãn nguồn. | Integer, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimNbFire` | CLAIM_COUNT | `int64` | `INT` | Không | Số claim cho category `Fire` theo nhãn nguồn. | Integer, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimNbOther` | CLAIM_COUNT | `int64` | `INT` | Không | Số claim cho category `Other` theo nhãn nguồn. | Integer, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimAmountRob` | CLAIM_AMOUNT | `int64`/`float64` | `DECIMAL(19,6)` | Không | Claim amount cho category `Rob` theo nhãn nguồn. | Hữu hạn, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimAmountPartColl` | CLAIM_AMOUNT | `int64` | `DECIMAL(19,6)` | Không | Claim amount cho category `PartColl` theo nhãn nguồn. | Hữu hạn, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimAmountTotColl` | CLAIM_AMOUNT | `int64`/`float64` | `DECIMAL(19,6)` | Không | Claim amount cho category `TotColl` theo nhãn nguồn. | Hữu hạn, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimAmountFire` | CLAIM_AMOUNT | `int64` | `DECIMAL(19,6)` | Không | Claim amount cho category `Fire` theo nhãn nguồn. | Hữu hạn, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+| `ClaimAmountOther` | CLAIM_AMOUNT | `int64` | `DECIMAL(19,6)` | Không | Claim amount cho category `Other` theo nhãn nguồn. | Hữu hạn, không âm; fact measure; `TARGET_DERIVED` và `LEAKAGE` cho dự báo outcome cùng kỳ. |
+
+Các khái niệm `Rob`, `PartColl`, `TotColl`, `Fire` và `Other` được giữ nguyên theo tên field nguồn. Không mở rộng ý nghĩa nghiệp vụ vượt quá bằng chứng hiện có.
+
+## Metric dẫn xuất đã xác minh
+
+| Metric | Công thức | Chính sách mẫu số / null | Phân loại |
 |---|---|---|---|
-| PredictionFactKey | BIGINT | PRIMARY KEY IDENTITY | Khóa thay thế (Surrogate Key) của bảng sự kiện dự đoán |
-| CustomerKey | INT | FOREIGN KEY | Liên kết tới Dim_Customer(CustomerKey) |
-| DateKey | INT | FOREIGN KEY | Ngày thực hiện dự đoán, liên kết tới Dim_Date(DateKey) |
-| PredictedClaimProbability | DECIMAL(6,4) | NOT NULL | Xác suất dự đoán phát sinh tổn thất (0.0000 - 1.0000) |
-| RiskCategory | NVARCHAR(20) | NOT NULL | Phân loại mức độ rủi ro ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL') |
-| ModelVersion | NVARCHAR(50) | NOT NULL | Phiên bản mô hình ML được sử dụng (VD: 'LightGBM_v1.0') |
-| CreatedDate | DATETIME2 | DEFAULT UTC | Thời điểm ghi nhận bản ghi |
-## 2. Phân loại theo nhóm nguồn (Source Groups)
+| `TotalClaimCount` | `ClaimNbRob + ClaimNbPartColl + ClaimNbTotColl + ClaimNbFire + ClaimNbOther` | NULL nếu bất kỳ input count bắt buộc nào NULL; snapshot hiện tại không có NULL. | `TARGET_DERIVED` |
+| `TotalClaimAmount` | Tổng năm cột `ClaimAmount*` | NULL nếu bất kỳ input amount bắt buộc nào NULL; snapshot hiện tại không có NULL. | `TARGET_DERIVED` |
+| `HasClaim` | `CASE WHEN TotalClaimCount > 0 THEN 1 ELSE 0 END` | NULL nếu `TotalClaimCount` NULL. | `TARGET_DERIVED` |
+| `ClaimFrequency` | `TotalClaimCount / ExposTotal` | NULL khi `ExposTotal <= 0`; không tạo infinity. | `TARGET_DERIVED` |
+| `LossRatio` | `TotalClaimAmount / PremTotal` | NULL khi `PremTotal <= 0`; không cap outlier. | `TARGET_DERIVED` |
 
-- **DRIVER**: `Gender`, `DrivAge` (nhân khẩu học và đặc tính người lái).
-- **VEHICLE**: `VehYear`, `VehModel`, `VehGroup` (đặc điểm phương tiện tham gia bảo hiểm).
-- **GEOGRAPHY**: `Area`, `State`, `StateAb` (vùng địa lý rủi ro và mã bang tại Brazil).
-- **EXPOSURE**: `ExposTotal`, `ExposFireRob` (thời gian phơi nhiễm rủi ro tính bằng car-years).
-- **PREMIUM**: `PremTotal`, `PremFireRob` (doanh thu phí bảo hiểm).
-- **SUM_INSURED**: `SumInsAvg` (giá trị được bảo hiểm).
-- **CLAIM_COUNT**: `ClaimNbRob`, `ClaimNbPartColl`, `ClaimNbTotColl`, `ClaimNbFire`, `ClaimNbOther` (tần suất sự kiện bồi thường theo từng loại rủi ro).
-- **CLAIM_AMOUNT**: `ClaimAmountRob`, `ClaimAmountPartColl`, `ClaimAmountTotColl`, `ClaimAmountFire`, `ClaimAmountOther` (mức độ nghiêm trọng tổn thất theo từng loại rủi ro).
-
----
-
-## 3. Ghi chú về nguồn dữ liệu Legacy (susep.gov.br)
-
-- File: `data/raw/susep.gov.br/insurance_dataset.csv` (~751 MB).
-- Bản chất: Đây là dữ liệu báo cáo thống kê thị trường vĩ mô theo tháng của cơ quan quản lý bảo hiểm Brazil (SUSEP) thu thập từ năm 2003.
-- Định vị: Được phân loại là **LEGACY / NON-CANONICAL SOURCE**. Giữ lại để đối chiếu vĩ mô khi cần thiết, nhưng không tham gia vào luồng ETL, Staging, DWH Star Schema hay Machine Learning của hệ thống hiện tại.
+Xem chính sách đầy đủ, grain, technical identity và batch semantics tại [source-data-contract.md](source-data-contract.md).

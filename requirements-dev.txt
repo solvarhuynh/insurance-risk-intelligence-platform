@@ -1,0 +1,6 @@
+# Development, static-validation and notebook tooling. Includes host runtime.
+-r requirements.txt
+# scripts/validate_repo.py uses this to parse docker-compose.yml without Docker CLI.
+PyYAML==6.0.3
+# Runs notebooks/01-eda.ipynb locally; not required by the staging loader.
+jupyterlab==4.6.4

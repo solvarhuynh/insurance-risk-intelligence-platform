@@ -1,322 +1,318 @@
 #!/usr/bin/env python3
-"""
-scripts/validate_repo.py
-Project: Insurance DWH, Performance Tuning & Machine Learning
-Muc dich: Entry-point kiem tra tinh (Static Baseline Validation) cho repository.
-Pham vi kiem tra:
-  1. Su ton tai cua cac tep bat buoc (Canonical Required Files)
-  2. Parse tinh tep cau hinh Docker Compose (PyYAML hoac docker compose config)
-  3. Bien dich cu phap Python (AST py_compile) tren dags/, ml/, scripts/
-  4. Parse tinh Notebooks JSON tren notebooks/
-  5. Kiem tra cau truc SQL (kich thuoc khong rong, can bang block comment /* */)
-  6. Kiem tra trung lap ten file canonical co ban
-  7. Báo cáo minh bach danh muc kiem tra Runtime duoc SKIPPED (PENDING_RUNTIME)
+"""Static validator for the canonical brvehins1 repository foundation.
 
-Luu y quan trong:
-  Script nay chi thuc hien STATIC VALIDATION.
-  Khong ket noi database, khong chay container va khong xac nhan RUNTIME_PASS.
+The validator deliberately reads only CSV headers. It does not profile rows,
+start containers, connect to SQL Server, or claim runtime success.
 """
+
+from __future__ import annotations
 
 import csv
 import json
 import os
 import py_compile
+import re
 import subprocess
 import sys
 from pathlib import Path
 
-# Thư mục gốc repository
-REPO_ROOT = Path(__file__).resolve().parent.parent
 
-# Danh sách file canonical bắt buộc phải tồn tại
-REQUIRED_CANONICAL_FILES = [
+REPO_ROOT = Path(__file__).resolve().parent.parent
+PARTITIONS = (
+    "brvehins1a.csv",
+    "brvehins1b.csv",
+    "brvehins1c.csv",
+    "brvehins1d.csv",
+    "brvehins1e.csv",
+)
+CANONICAL_HEADER = (
+    "Gender", "DrivAge", "VehYear", "VehModel", "VehGroup", "Area",
+    "State", "StateAb", "ExposTotal", "ExposFireRob", "PremTotal",
+    "PremFireRob", "SumInsAvg", "ClaimNbRob", "ClaimNbPartColl",
+    "ClaimNbTotColl", "ClaimNbFire", "ClaimNbOther", "ClaimAmountRob",
+    "ClaimAmountPartColl", "ClaimAmountTotColl", "ClaimAmountFire",
+    "ClaimAmountOther",
+)
+REQUIRED_FILES = (
     "README.md",
-    "docker-compose.yml",
     ".gitignore",
+    "requirements.txt",
+    "requirements-dev.txt",
+    "docker-compose.yml",
     "log/progress-log.md",
-    "docs/specs/implementation-guide.md",
+    "docs/architecture/architecture-explained.md",
+    "docs/architecture/data-dictionary.md",
     "docs/architecture/repository-structure.md",
     "docs/guides/how-to-run.md",
+    "docs/specs/implementation-guide.md",
     "migrations/V1__create_dwh_schema.sql",
-    "dags/insurance_dwh_pipeline.py",
-    "ml/train_risk_model.py",
-    "ml/predict_risk_batch.py",
     "notebooks/01-eda.ipynb",
+    "scripts/validate_repo.py",
     "data/raw/.gitkeep",
-    "data/raw/brvehins1/brvehins1a.csv",
-    "data/raw/brvehins1/brvehins1b.csv",
-    "data/raw/brvehins1/brvehins1c.csv",
-    "data/raw/brvehins1/brvehins1d.csv",
-    "data/raw/brvehins1/brvehins1e.csv",
     "data/raw/susep.gov.br/insurance_dataset.csv",
     "powerbi/.gitkeep",
-    "scripts/validate_repo.py",
-    "sql/01_load_staging.sql",
-    "sql/02_enable_cdc.sql",
-    "sql/03_sp_dim_customer_scd2.sql",
-    "sql/04_sp_dim_others.sql",
-    "sql/05_sp_fact_premium.sql",
-    "sql/06_sp_fact_claims.sql",
-    "sql/07_data_quality_checks.sql",
-    "sql/08_sp_load_risk_predictions.sql",
-    ".cursor/rules/01-quy-trinh-thuc-hien.mdc",
-    ".cursor/rules/02-quan-ly-file-va-log.mdc",
-    ".cursor/rules/03-kiem-tra-git-va-review.mdc",
-    ".cursor/rules/04-python.mdc",
-    ".cursor/rules/05-setup-handoff.mdc",
-]
+)
+CURRENT_DOCS = (
+    "README.md",
+    "docs/architecture/architecture-explained.md",
+    "docs/architecture/data-dictionary.md",
+    "docs/architecture/repository-structure.md",
+    "docs/guides/glossary.md",
+    "docs/guides/how-to-run.md",
+    "docs/reports/insights.md",
+    "docs/specs/implementation-guide.md",
+)
+FORBIDDEN_CURRENT_DOC_TERMS = (
+    "porto seguro",
+    "safe driver",
+    "prudent",
+    "train.csv",
+    "test.csv",
+    "ps_ind_",
+    "ps_reg_",
+    "ps_car_",
+    "ps_calc_",
+)
 
 
 class ValidationReporter:
-    def __init__(self):
-        self.results = []
+    """Collect and print individual static validation results."""
 
-    def add(self, category: str, item: str, status: str, detail: str = ""):
-        self.results.append({
-            "category": category,
-            "item": item,
-            "status": status,
-            "detail": detail
-        })
-        prefix = f"[{status}]"
-        print(f"{prefix:<10} {category:<20} {item:<40} {detail}")
+    def __init__(self) -> None:
+        self.results: list[dict[str, str]] = []
 
-    def summary(self):
-        passed = sum(1 for r in self.results if r["status"] == "PASS")
-        failed = sum(1 for r in self.results if r["status"] == "FAIL")
-        skipped = sum(1 for r in self.results if r["status"] == "SKIPPED")
-        print("\n" + "=" * 78)
-        print(f"VALIDATION SUMMARY: {passed} PASSED | {failed} FAILED | {skipped} SKIPPED")
-        print("=" * 78)
+    def add(self, category: str, item: str, status: str, detail: str) -> None:
+        self.results.append(
+            {"category": category, "item": item, "status": status, "detail": detail}
+        )
+        print(f"[{status}] {category}: {item} — {detail}")
+
+    def success(self) -> bool:
+        passed = sum(result["status"] == "PASS" for result in self.results)
+        failed = sum(result["status"] == "FAIL" for result in self.results)
+        skipped = sum(result["status"] == "SKIPPED" for result in self.results)
+        print(f"\nVALIDATION SUMMARY: {passed} PASSED | {failed} FAILED | {skipped} SKIPPED")
         return failed == 0
 
 
-def check_canonical_files(reporter: ValidationReporter):
-    print("\n--- 1. Kiem tra cac tep canonical bat buoc ---")
-    for rel_path in REQUIRED_CANONICAL_FILES:
-        target = REPO_ROOT / rel_path
-        if target.exists() and target.is_file():
-            reporter.add("Canonical Files", rel_path, "PASS", "Tep ton tai")
-        else:
-            reporter.add("Canonical Files", rel_path, "FAIL", "Khong tim thay tep")
+def check_required_files(reporter: ValidationReporter) -> None:
+    """Confirm canonical project files are present."""
+    for relative_path in REQUIRED_FILES:
+        path = REPO_ROOT / relative_path
+        status = "PASS" if path.is_file() else "FAIL"
+        detail = "Tệp tồn tại" if status == "PASS" else "Không tìm thấy tệp"
+        reporter.add("Required file", relative_path, status, detail)
 
 
-def check_docker_compose(reporter: ValidationReporter):
-    print("\n--- 2. Kiem tra Docker Compose Configuration ---")
-    print("\n--- 3. Kiem tra Docker Compose Configuration ---")
-    compose_path = REPO_ROOT / "docker-compose.yml"
-    if not compose_path.exists():
-        reporter.add("Docker Compose", "docker-compose.yml", "FAIL", "Khong tim thay tep")
+def check_dependency_manifests(reporter: ValidationReporter) -> None:
+    """Keep host, dev/notebook and Airflow dependency boundaries explicit."""
+    host_path = REPO_ROOT / "requirements.txt"
+    dev_path = REPO_ROOT / "requirements-dev.txt"
+    host_lines = {
+        line.strip()
+        for line in host_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    dev_lines = {
+        line.strip()
+        for line in dev_path.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+    expected_host = {"numpy==2.4.6", "pandas==3.0.3", "pyodbc==5.3.0"}
+    expected_dev = {"-r requirements.txt", "PyYAML==6.0.3", "jupyterlab==4.6.4"}
+    missing_host = expected_host - host_lines
+    missing_dev = expected_dev - dev_lines
+    airflow_declared = any("airflow" in line.lower() for line in host_lines | dev_lines)
+    if missing_host or missing_dev or airflow_declared:
+        details: list[str] = []
+        if missing_host:
+            details.append(f"thiếu host: {', '.join(sorted(missing_host))}")
+        if missing_dev:
+            details.append(f"thiếu dev: {', '.join(sorted(missing_dev))}")
+        if airflow_declared:
+            details.append("Airflow phải chỉ nằm trong Docker image")
+        reporter.add("Python dependencies", "requirements manifests", "FAIL", "; ".join(details))
+    else:
+        reporter.add(
+            "Python dependencies",
+            "requirements manifests",
+            "PASS",
+            "Host/dev tách rõ; Airflow không bị cài vào host Python",
+        )
+
+
+def check_gitignore(reporter: ValidationReporter) -> None:
+    """Confirm raw files remain ignored while the placeholder is retained."""
+    gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8")
+    expected_rules = ("data/raw/*", "!data/raw/.gitkeep")
+    missing = [rule for rule in expected_rules if rule not in gitignore]
+    if missing:
+        reporter.add("Git ignore", ".gitignore", "FAIL", f"Thiếu rule: {', '.join(missing)}")
+    else:
+        reporter.add("Git ignore", ".gitignore", "PASS", "Raw được ignore, .gitkeep được giữ lại")
+
+
+def check_raw_dataset(reporter: ValidationReporter) -> None:
+    """Validate exact partitions, non-empty files, readable headers and schema equality."""
+    raw_dir = REPO_ROOT / "data" / "raw" / "brvehins1"
+    if not raw_dir.is_dir():
+        reporter.add("Raw dataset", "data/raw/brvehins1", "FAIL", "Không có thư mục nguồn chuẩn")
         return
 
-    # Kiem tra qua thu vien PyYAML neu co
+    actual = tuple(sorted(path.name for path in raw_dir.glob("*.csv")))
+    if actual != PARTITIONS:
+        reporter.add("Raw dataset", "Canonical partitions", "FAIL", f"Tìm thấy: {', '.join(actual)}")
+        return
+    reporter.add("Raw dataset", "Canonical partitions", "PASS", "Có đúng năm partition bắt buộc")
+
+    headers: dict[str, tuple[str, ...]] = {}
+    for name in PARTITIONS:
+        path = raw_dir / name
+        if path.stat().st_size == 0:
+            reporter.add("Raw dataset", name, "FAIL", "File rỗng")
+            continue
+        try:
+            with path.open("r", encoding="utf-8-sig", newline="") as handle:
+                header = tuple(next(csv.reader(handle)))
+            if not header:
+                reporter.add("Raw dataset", name, "FAIL", "Header rỗng")
+                continue
+            headers[name] = header
+            reporter.add("Raw dataset", name, "PASS", f"Header đọc được; {len(header)} cột")
+        except (OSError, StopIteration, csv.Error) as error:
+            reporter.add("Raw dataset", name, "FAIL", f"Không đọc được header: {error}")
+
+    if len(headers) != len(PARTITIONS):
+        return
+    header_values = tuple(headers.values())
+    if len(set(header_values)) != 1:
+        reporter.add("Raw dataset", "Schema equality", "FAIL", "Schema giữa các partition khác nhau")
+    elif header_values[0] != CANONICAL_HEADER:
+        reporter.add("Raw dataset", "Canonical header", "FAIL", "Header không khớp contract đã biết")
+    else:
+        reporter.add("Raw dataset", "Schema equality", "PASS", "Năm schema bằng nhau và có 23 cột chuẩn")
+
+
+def check_current_docs(reporter: ValidationReporter) -> None:
+    """Prevent active documentation from reverting to a superseded source design."""
+    content = "\n".join((REPO_ROOT / path).read_text(encoding="utf-8").lower() for path in CURRENT_DOCS)
+    missing_requirements = [term for term in ("brvehins1", "legacy / non-canonical") if term not in content]
+    stale_terms = [term for term in FORBIDDEN_CURRENT_DOC_TERMS if term in content]
+    unsupported_metric = re.search(r"roc\s*[- ]?auc\s*(?:>|>=)", content)
+    if missing_requirements:
+        reporter.add("Current docs", "Canonical source", "FAIL", f"Thiếu: {', '.join(missing_requirements)}")
+    elif stale_terms:
+        reporter.add("Current docs", "Canonical source", "FAIL", f"Còn thuật ngữ cũ: {', '.join(stale_terms)}")
+    elif unsupported_metric:
+        reporter.add("Current docs", "ML acceptance", "FAIL", "Còn ngưỡng ROC-AUC chưa có bằng chứng")
+    else:
+        reporter.add("Current docs", "Canonical source", "PASS", "Tài liệu hiện hành dùng brvehins1 và nêu rõ legacy non-canonical")
+
+
+def check_docker_compose(reporter: ValidationReporter) -> None:
+    """Parse Docker Compose without starting any runtime service."""
+    compose_path = REPO_ROOT / "docker-compose.yml"
     try:
         import yaml
-        with open(compose_path, "r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
-        if isinstance(data, dict) and "services" in data:
-            services = list(data["services"].keys())
-            if "sqlserver" in services and "airflow" in services:
-                reporter.add("Docker Compose", "docker-compose.yml", "PASS", f"Services xac nhan: {', '.join(services)}")
-            else:
-                reporter.add("Docker Compose", "docker-compose.yml", "FAIL", f"Thieu service bat buoc (can sqlserver, airflow; co: {services})")
+
+        compose = yaml.safe_load(compose_path.read_text(encoding="utf-8"))
+        services = compose.get("services", {}) if isinstance(compose, dict) else {}
+        if "sqlserver" not in services:
+            reporter.add("Docker compose", "docker-compose.yml", "FAIL", "Thiếu service sqlserver")
         else:
-            reporter.add("Docker Compose", "docker-compose.yml", "FAIL", "Cac dinh nghia services khong hop le")
+            reporter.add("Docker compose", "docker-compose.yml", "PASS", "YAML hợp lệ, có service sqlserver")
         return
     except ImportError:
         pass
-    except Exception as e:
-        reporter.add("Docker Compose", "docker-compose.yml", "FAIL", f"Loi parse YAML: {e}")
+    except Exception as error:
+        reporter.add("Docker compose", "docker-compose.yml", "FAIL", f"YAML không hợp lệ: {error}")
         return
 
-    # Fallback goi docker compose config
     try:
-        res = subprocess.run(["docker", "compose", "config", "-q"], cwd=str(REPO_ROOT), capture_output=True, text=True)
-        if res.returncode == 0:
-            reporter.add("Docker Compose", "docker-compose.yml", "PASS", "Parse thanh cong qua docker compose config CLI")
-        else:
-            reporter.add("Docker Compose", "docker-compose.yml", "FAIL", res.stderr.strip())
+        result = subprocess.run(
+            ["docker", "compose", "config", "-q"],
+            cwd=REPO_ROOT,
+            capture_output=True,
+            text=True,
+            check=False,
+        )
     except FileNotFoundError:
-        reporter.add("Docker Compose", "docker-compose.yml", "SKIPPED", "PyYAML chua cai va docker CLI khong kha dung")
+        reporter.add("Docker compose", "docker-compose.yml", "SKIPPED", "Không có PyYAML hoặc Docker CLI")
+        return
+    if result.returncode == 0:
+        reporter.add("Docker compose", "docker-compose.yml", "PASS", "docker compose config hợp lệ")
+    else:
+        reporter.add("Docker compose", "docker-compose.yml", "FAIL", result.stderr.strip() or "Compose không hợp lệ")
 
 
-def check_python_files(reporter: ValidationReporter):
-    print("\n--- 3. Bien dich cu phap Python (py_compile) ---")
-    print("\n--- 4. Bien dich cu phap Python (py_compile) ---")
-    py_dirs = ["dags", "ml", "scripts"]
-    for d in py_dirs:
-        dir_path = REPO_ROOT / d
-        if not dir_path.exists():
-            continue
-        for py_file in dir_path.rglob("*.py"):
-            rel_name = py_file.relative_to(REPO_ROOT).as_posix()
+def check_python_syntax(reporter: ValidationReporter) -> None:
+    """Compile maintained Python files without importing runtime dependencies."""
+    for directory in ("scripts", "ml", "dags"):
+        for path in sorted((REPO_ROOT / directory).rglob("*.py")):
+            relative_path = path.relative_to(REPO_ROOT).as_posix()
             try:
-                py_compile.compile(str(py_file), doraise=True)
-                reporter.add("Python Syntax", rel_name, "PASS", "Cu phap hop le")
-            except py_compile.PyCompileError as e:
-                reporter.add("Python Syntax", rel_name, "FAIL", f"Loi cu phap: {e}")
+                py_compile.compile(str(path), doraise=True)
+                reporter.add("Python syntax", relative_path, "PASS", "py_compile thành công")
+            except py_compile.PyCompileError as error:
+                reporter.add("Python syntax", relative_path, "FAIL", str(error))
 
 
-def check_notebooks(reporter: ValidationReporter):
-    print("\n--- 4. Parse Notebooks (JSON validity) ---")
-    print("\n--- 5. Parse Notebooks (JSON validity) ---")
-    nb_dir = REPO_ROOT / "notebooks"
-    if not nb_dir.exists():
-        reporter.add("Notebooks", "notebooks/", "SKIPPED", "Thu muc notebooks khong ton tai")
-        return
-
-    nb_files = list(nb_dir.glob("*.ipynb"))
-    if not nb_files:
-        reporter.add("Notebooks", "notebooks/", "SKIPPED", "Khong co tep .ipynb")
-        return
-
-    for nb_file in nb_files:
-        rel_name = nb_file.relative_to(REPO_ROOT).as_posix()
+def check_notebooks(reporter: ValidationReporter) -> None:
+    """Ensure notebooks remain valid JSON artifacts."""
+    for path in sorted((REPO_ROOT / "notebooks").glob("*.ipynb")):
+        relative_path = path.relative_to(REPO_ROOT).as_posix()
         try:
-            with open(nb_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            if "cells" in data and "metadata" in data:
-                reporter.add("Notebooks", rel_name, "PASS", f"JSON hop le ({len(data['cells'])} cells)")
+            notebook = json.loads(path.read_text(encoding="utf-8"))
+            valid = isinstance(notebook.get("cells"), list) and "metadata" in notebook
+            reporter.add("Notebook", relative_path, "PASS" if valid else "FAIL", "JSON hợp lệ" if valid else "Thiếu cells hoặc metadata")
+        except (OSError, json.JSONDecodeError) as error:
+            reporter.add("Notebook", relative_path, "FAIL", f"JSON không hợp lệ: {error}")
+
+
+def check_sql_structure(reporter: ValidationReporter) -> None:
+    """Apply minimal structural checks without treating them as SQL execution."""
+    for directory in ("migrations", "sql"):
+        for path in sorted((REPO_ROOT / directory).glob("*.sql")):
+            relative_path = path.relative_to(REPO_ROOT).as_posix()
+            content = path.read_text(encoding="utf-8")
+            if not content.strip():
+                reporter.add("SQL structure", relative_path, "FAIL", "File SQL rỗng")
+            elif content.count("/*") != content.count("*/"):
+                reporter.add("SQL structure", relative_path, "FAIL", "Block comment không cân bằng")
             else:
-                reporter.add("Notebooks", rel_name, "FAIL", "Thieu key 'cells' hoac 'metadata'")
-        except Exception as e:
-            reporter.add("Notebooks", rel_name, "FAIL", f"Loi parse JSON: {e}")
+                reporter.add("SQL structure", relative_path, "PASS", "Không rỗng, block comment cân bằng")
 
 
-def check_sql_files(reporter: ValidationReporter):
-    print("\n--- 5. Kiem tra cau truc cac tep SQL ---")
-    print("\n--- 6. Kiem tra cau truc cac tep SQL ---")
-    sql_dirs = ["sql", "migrations"]
-    for d in sql_dirs:
-        dir_path = REPO_ROOT / d
-        if not dir_path.exists():
-            continue
-        for sql_file in sorted(dir_path.glob("*.sql")):
-            rel_name = sql_file.relative_to(REPO_ROOT).as_posix()
-            size = sql_file.stat().st_size
-            if size == 0:
-                reporter.add("SQL Structure", rel_name, "FAIL", "Tep rong (0 bytes)")
-                continue
-
-            # Kiem tra can bang block comment /* */
-            try:
-                with open(sql_file, "r", encoding="utf-8") as f:
-                    content = f.read()
-                open_blocks = content.count("/*")
-                close_blocks = content.count("*/")
-                if open_blocks == close_blocks:
-                    reporter.add("SQL Structure", rel_name, "PASS", f"Size: {size}B, Block comments can bang ({open_blocks}/{close_blocks})")
-                else:
-                    reporter.add("SQL Structure", rel_name, "FAIL", f"Mat can bang block comments (/* : {open_blocks}, */ : {close_blocks})")
-            except Exception as e:
-                reporter.add("SQL Structure", rel_name, "FAIL", f"Loi doc file: {e}")
+def report_runtime_scope(reporter: ValidationReporter) -> None:
+    """State clearly which validations this static entry point cannot certify."""
+    for item in (
+        "Docker container running",
+        "SQL Server connectivity",
+        "Database migration execution",
+        "Staging ingestion and reconciliation",
+        "DWH reconciliation",
+        "Data Quality execution",
+        "Airflow execution",
+        "ML training or scoring",
+    ):
+        reporter.add("Runtime scope", item, "SKIPPED", "Ngoài phạm vi static validator")
 
 
-def check_duplicate_canonical_files(reporter: ValidationReporter):
-    print("\n--- 6. Kiem tra trung lap ten file canonical co ban ---")
-    print("\n--- 7. Kiem tra trung lap ten file canonical co ban ---")
-    # Kiem tra cac file script hoac rule co bi tao trung lap o thu muc khac khong
-    basenames = {}
-    ignore_dirs = {".git", ".venv", "__pycache__"}
-    duplicates_found = False
-
-    canonical_basenames = {Path(p).name for p in REQUIRED_CANONICAL_FILES}
-    for root, dirs, files in os.walk(REPO_ROOT):
-        dirs[:] = [d for d in dirs if d not in ignore_dirs]
-        for f in files:
-            if f in canonical_basenames:
-                rel_f = Path(root, f).relative_to(REPO_ROOT).as_posix()
-                basenames.setdefault(f, []).append(rel_f)
-
-    for f, paths in basenames.items():
-        if len(paths) > 1 and f != ".gitkeep":
-            duplicates_found = True
-            reporter.add("Duplicate Check", f, "FAIL", f"Trung lap tai: {', '.join(paths)}")
-
-    if not duplicates_found:
-        reporter.add("Duplicate Check", "Canonical Basenames", "PASS", "Khong co trung lap ten file bat thuong")
-
-
-def check_raw_dataset_brvehins1(reporter: ValidationReporter):
-    print("\n--- 2. Kiem tra tap du lieu tho canonical brvehins1 ---")
-    br_dir = REPO_ROOT / "data" / "raw" / "brvehins1"
-    if not br_dir.exists() or not br_dir.is_dir():
-        reporter.add("Raw Dataset", "data/raw/brvehins1", "FAIL", "Thu muc khong ton tai")
-        return
-
-    partitions = ["brvehins1a.csv", "brvehins1b.csv", "brvehins1c.csv", "brvehins1d.csv", "brvehins1e.csv"]
-    headers = {}
-    for p in partitions:
-        p_path = br_dir / p
-        if not p_path.exists():
-            reporter.add("Raw Dataset", f"brvehins1/{p}", "FAIL", "Tep khong ton tai")
-            continue
-        size = p_path.stat().st_size
-        if size == 0:
-            reporter.add("Raw Dataset", f"brvehins1/{p}", "FAIL", "Tep rong (0 bytes)")
-            continue
-        try:
-            with open(p_path, "r", encoding="utf-8", errors="replace") as f:
-                reader = csv.reader(f)
-                header = next(reader)
-                headers[p] = header
-        except Exception as e:
-            reporter.add("Raw Dataset", f"brvehins1/{p}", "FAIL", f"Loi doc header: {e}")
-
-    if len(headers) == len(partitions):
-        base_header = headers["brvehins1a.csv"]
-        all_match = all(h == base_header for h in headers.values())
-        if all_match:
-            reporter.add("Raw Dataset", "brvehins1 partitions", "PASS", f"5 phan doan hop le, schema dong nhat ({len(base_header)} cot)")
-        else:
-            reporter.add("Raw Dataset", "brvehins1 partitions", "FAIL", "Schema giua cac phan doan khong khop nhau")
-
-
-def report_skipped_runtime_validations(reporter: ValidationReporter):
-    print("\n--- 7. Danh muc kiem tra Runtime duoc SKIPPED (PENDING_RUNTIME) ---")
-    print("\n--- 8. Danh muc kiem tra Runtime duoc SKIPPED (PENDING_RUNTIME) ---")
-    skipped_items = [
-        ("SQL Server Connectivity", "Ket noi mang toi localhost:1433", "Chua khoi dong container sqlserver"),
-        ("Flyway / DbUp Migration", "Thuc thi V1__create_dwh_schema.sql tao DWH_Insurance", "Can SQL Server runtime va cong cu migration"),
-        ("Staging BULK INSERT", "Nap du lieu CSV tho vao Staging_InsuranceRaw", "Can du lieu CSV that va SQL Server runtime"),
-        ("Staging BULK INSERT", "Nap 5 phan doan CSV brvehins1 vao Staging_InsuranceRaw", "Can SQL Server runtime va kiem tra BULK INSERT"),
-        ("CDC Enable & Capture", "Kich hoat sys.sp_cdc_enable_db va bat LSN watermark", "Can SQL Server Agent runtime"),
-        ("SCD2 Idempotency", "sp_Load_DimCustomer kiem tra versioning va idempotent rerun", "Can du lieu Staging va database runtime"),
-        ("Fact Referential Integrity", "sp_Load_FactPremium, sp_Load_FactClaims FK integrity", "Can cac bang Dim duoc nap truoc"),
-        ("Data Quality Execution", "sp_Run_DataQualityChecks va kiem tra ngat pipeline", "Can cac bang Fact/Dim trong DWH"),
-        ("SCD2 / Dimension Load", "Nap Dimension theo data contract brvehins1", "Can du lieu Staging va database runtime"),
-        ("Fact Referential Integrity", "sp_Load_Fact* FK integrity theo schema brvehins1", "Can cac bang Dim duoc nap truoc"),
-        ("Data Quality Execution", "sp_Run_DataQualityChecks theo cac rule brvehins1", "Can cac bang Fact/Dim trong DWH"),
-        ("Airflow DAG Run", "Thuc thi insurance_dwh_pipeline tren webserver/scheduler", "Can khoi dong Airflow container"),
-        ("ML Model Training", "Huan luyen mo hinh tu du lieu Porto Seguro that", "Can du lieu train.csv va scikit-learn"),
-        ("Performance Benchmark", "Do STATISTICS IO/TIME truoc va sau khi tao index", "Can du lieu Fact ~8-10 trieu dong tren DWH"),
-        ("ML Model Training", "Huan luyen mo hinh tu du lieu brvehins1", "Can hoan thien data contract va scikit-learn"),
-        ("Performance Benchmark", "Do STATISTICS IO/TIME truoc va sau khi tao index", "Can du lieu Fact ~2 trieu dong tren DWH"),
-        ("Power BI Dashboard", "Kiem tra ket noi truc tiep Power BI toi DWH_Insurance", "Can DWH hoan thanh va Power BI Desktop"),
-    ]
-    for item, action, reason in skipped_items:
-        reporter.add("Runtime Checklist", item, "SKIPPED", f"{action} -> {reason}")
-
-
-def main():
-    print("=" * 78)
-    print("INSURANCE DWH - STATIC REPOSITORY VALIDATION")
-    print(f"Repository Root: {REPO_ROOT}")
-    print("=" * 78)
-
+def main() -> int:
+    """Run all static checks and return a process exit code."""
     reporter = ValidationReporter()
-    check_canonical_files(reporter)
-    check_raw_dataset_brvehins1(reporter)
+    check_required_files(reporter)
+    check_dependency_manifests(reporter)
+    check_gitignore(reporter)
+    check_raw_dataset(reporter)
+    check_current_docs(reporter)
     check_docker_compose(reporter)
-    check_python_files(reporter)
+    check_python_syntax(reporter)
     check_notebooks(reporter)
-    check_sql_files(reporter)
-    check_duplicate_canonical_files(reporter)
-    report_skipped_runtime_validations(reporter)
-
-    success = reporter.summary()
-    sys.exit(0 if success else 1)
+    check_sql_structure(reporter)
+    report_runtime_scope(reporter)
+    return 0 if reporter.success() else 1
 
 
 if __name__ == "__main__":
-    main()
+    raise SystemExit(main())

@@ -4,3 +4,6 @@ numpy==2.4.6
 pandas==3.0.3
 # SQL Server staging loader: scripts/load_brvehins1_to_staging.py.
 pyodbc==5.3.0
+# Reproducible cross-sectional ML pipeline: preprocessing, split and estimators.
+scikit-learn==1.7.2
+joblib==1.5.2

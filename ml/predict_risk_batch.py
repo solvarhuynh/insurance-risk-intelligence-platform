@@ -1,77 +1,155 @@
+#!/usr/bin/env python3
+"""Score the reproducible bounded held-out test set into SQL Server safely."""
+
+from __future__ import annotations
+
+import argparse
+import json
+import uuid
+from datetime import datetime, timezone
+from time import perf_counter
+
+import joblib
+import pyodbc
+
+from modeling import (
+    MODEL_FEATURES,
+    REPO_ROOT,
+    assign_splits,
+    connection_string,
+    extract_bounded_population,
+)
+
+
+MODEL_VERSION = "claim_risk_model_v001"
+POPULATION = "bounded_held_out_test"
+THRESHOLD = 0.5
+
+TEMP_TABLE_SQL = """
+CREATE TABLE #PredictionLoad (
+    SourceFile nvarchar(128) NOT NULL,
+    SourceRowNumber int NOT NULL,
+    SourceRecordHash char(64) NOT NULL,
+    ScoringPopulation nvarchar(64) NOT NULL,
+    ModelVersion nvarchar(160) NOT NULL,
+    ScoreProbabilityText nvarchar(32) NOT NULL,
+    ThresholdValueText nvarchar(10) NOT NULL,
+    PredictedHasClaim bit NOT NULL,
+    ScoringRunId uniqueidentifier NOT NULL
+);
 """
-predict_risk_batch.py
-Muc dich: Chay du doan rui ro theo lo (Batch Inference) cho cac khach hang / hop dong moi nap vao DWH.
-          Duoc dieu phoi tu dong boi task 'predict_customer_risk' trong Airflow DAG.
-Output: Tap ket qua du doan (CustomerKey, DateKey, PredictedClaimProbability, RiskCategory, ModelVersion)
-        chuan bi nap vao Fact_Customer_Risk_Prediction trong DWH.
+
+TEMP_INSERT_SQL = """
+INSERT INTO #PredictionLoad
+    (SourceFile, SourceRowNumber, SourceRecordHash, ScoringPopulation, ModelVersion,
+     ScoreProbabilityText, ThresholdValueText, PredictedHasClaim, ScoringRunId)
+VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);
 """
 
-import os
-import sys
-import pickle
-from datetime import datetime
+MERGE_SQL = """
+MERGE dwh.RiskObservationPrediction AS target
+USING (
+    SELECT SourceFile, SourceRowNumber, SourceRecordHash, ScoringPopulation, ModelVersion,
+           CONVERT(decimal(12,10), ScoreProbabilityText) AS ScoreProbability,
+           CONVERT(decimal(5,4), ThresholdValueText) AS ThresholdValue,
+           PredictedHasClaim, ScoringRunId
+    FROM #PredictionLoad
+) AS source
+ON target.SourceFile = source.SourceFile
+ AND target.SourceRowNumber = source.SourceRowNumber
+ AND target.ScoringPopulation = source.ScoringPopulation
+ AND target.ModelVersion = source.ModelVersion
+WHEN MATCHED THEN UPDATE SET
+    SourceRecordHash = source.SourceRecordHash,
+    ScoreProbability = source.ScoreProbability,
+    ThresholdValue = source.ThresholdValue,
+    PredictedHasClaim = source.PredictedHasClaim,
+    ScoringRunId = source.ScoringRunId,
+    ScoredAtUtc = SYSUTCDATETIME()
+WHEN NOT MATCHED THEN INSERT
+    (SourceFile, SourceRowNumber, SourceRecordHash, ScoringPopulation, ModelVersion,
+     ScoreProbability, ThresholdValue, PredictedHasClaim, ScoringRunId)
+VALUES
+    (source.SourceFile, source.SourceRowNumber, source.SourceRecordHash, source.ScoringPopulation, source.ModelVersion,
+     source.ScoreProbability, source.ThresholdValue, source.PredictedHasClaim, source.ScoringRunId);
+"""
 
 
-def load_model_artifact(model_path: str = "ml/risk_model.pkl"):
-    """
-    Nap pre-trained model artifact tu dia de thuc hien du doan.
-    """
-    if not os.path.exists(model_path):
-        print(f"Warning: Model artifact not found at {model_path}. Using fallback default rules.")
-        return None
-    with open(model_path, "rb") as f:
-        model = pickle.load(f)
-    print(f"Loaded model artifact from {model_path}")
-    return model
-
-
-def fetch_batch_features_for_inference(batch_id: str = None):
-    """
-    TODO: Doc tap dac trung cua cac khach hang chua duoc danh gia rui ro tu DWH.
-    Vi du:
-        SELECT c.CustomerKey, c.CustomerId, c.Age, c.VehicleAge, ...
-        FROM DWH_Insurance.dbo.Dim_Customer c
-        LEFT JOIN DWH_Insurance.dbo.Fact_Customer_Risk_Prediction p
-            ON c.CustomerKey = p.CustomerKey
-        WHERE p.CustomerKey IS NULL AND c.Is_Current = 1
-    """
-    print(f"Fetching unscored customer features for batch {batch_id}...")
-    return []
-
-
-def run_batch_scoring(model, customer_data):
-    """
-    TODO: Thuc hien du doan xac suat rui ro va gan nhan phan loai.
-    Quy tac phan nhom rui ro (RiskCategory):
-      - Probability < 0.10: 'LOW'
-      - 0.10 <= Probability < 0.30: 'MEDIUM'
-      - 0.30 <= Probability < 0.60: 'HIGH'
-      - Probability >= 0.60: 'CRITICAL'
-    """
-    print("Running batch risk scoring on customer records...")
-    predictions = []
-    # Vi du stub ket qua du doan:
-    # probs = model.predict_proba(features)[:, 1]
-    return predictions
-
-
-def export_predictions_for_dwh_load(predictions, output_path: str = "data/raw/stg_risk_predictions.csv"):
-    """
-    Xuat ket qua ra file CSV trung gian hoac bang staging de procedure sql/08_sp_load_risk_predictions.sql
-    nap vao bang Fact_Customer_Risk_Prediction.
-    """
-    print(f"Exporting predictions to staging location: {output_path}")
-    # TODO: Luu file CSV dinh dang chuan de SQL Server BULK INSERT / MERGE
-
-
-def main():
-    batch_id = sys.argv[1] if len(sys.argv) > 1 else datetime.utcnow().strftime("%Y%m%d%H%M%S")
-    print(f"Starting Batch Risk Prediction Job for Batch: {batch_id}")
-    model = load_model_artifact()
-    features = fetch_batch_features_for_inference(batch_id)
-    predictions = run_batch_scoring(model, features)
-    export_predictions_for_dwh_load(predictions)
-    print("Batch Risk Prediction Job completed successfully.")
+def main() -> None:
+    parser = argparse.ArgumentParser(description="Score bounded held-out brvehins1 observations.")
+    parser.add_argument("--run-id", type=uuid.UUID, default=uuid.uuid4())
+    args = parser.parse_args()
+    artifact_path = REPO_ROOT / "ml/artifacts" / f"{MODEL_VERSION}.joblib"
+    metadata_path = REPO_ROOT / "ml/artifacts" / f"{MODEL_VERSION}.metadata.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    if metadata["model_version"] != MODEL_VERSION:
+        raise RuntimeError("Artifact metadata không khớp model version của scorer.")
+    model = joblib.load(artifact_path)
+    population = assign_splits(extract_bounded_population())
+    test = population.loc[population["Split"] == "test"].copy()
+    score_started = perf_counter()
+    probabilities = model.predict_proba(test[MODEL_FEATURES])[:, 1]
+    scoring_seconds = perf_counter() - score_started
+    if len(probabilities) != len(test):
+        raise RuntimeError("Số probability không bằng scoring population.")
+    records = [
+        (
+            str(row.SourceFile),
+            int(row.SourceRowNumber),
+            str(row.SourceRecordHash),
+            POPULATION,
+            MODEL_VERSION,
+            f"{float(probability):.10f}",
+            "0.5000",
+            bool(probability >= THRESHOLD),
+            str(args.run_id),
+        )
+        for row, probability in zip(test.itertuples(index=False), probabilities, strict=True)
+    ]
+    with pyodbc.connect(connection_string()) as connection:
+        cursor = connection.cursor()
+        cursor.execute(TEMP_TABLE_SQL)
+        cursor.fast_executemany = True
+        cursor.executemany(TEMP_INSERT_SQL, records)
+        cursor.execute(MERGE_SQL)
+        connection.commit()
+        stored_rows = int(
+            cursor.execute(
+                "SELECT COUNT_BIG(*) FROM dwh.RiskObservationPrediction WHERE ScoringPopulation=? AND ModelVersion=?",
+                POPULATION,
+                MODEL_VERSION,
+            ).fetchval()
+        )
+        duplicate_rows = int(
+            cursor.execute(
+                """
+                SELECT COUNT(*) FROM (
+                    SELECT SourceFile, SourceRowNumber, COUNT(*) AS c
+                    FROM dwh.RiskObservationPrediction
+                    WHERE ScoringPopulation=? AND ModelVersion=?
+                    GROUP BY SourceFile, SourceRowNumber HAVING COUNT(*) > 1
+                ) AS duplicate_identity;
+                """,
+                POPULATION,
+                MODEL_VERSION,
+            ).fetchval()
+        )
+    result = {
+        "run_id": str(args.run_id),
+        "population": POPULATION,
+        "model_version": MODEL_VERSION,
+        "expected_rows": int(len(test)),
+        "predicted_rows": int(len(probabilities)),
+        "stored_rows": stored_rows,
+        "difference_expected_to_stored": int(len(test) - stored_rows),
+        "duplicate_source_identity_rows": duplicate_rows,
+        "threshold": THRESHOLD,
+        "scoring_seconds": round(scoring_seconds, 6),
+        "scored_at_utc": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    if result["difference_expected_to_stored"] != 0 or duplicate_rows != 0:
+        raise RuntimeError(f"Prediction reconciliation thất bại: {result}")
+    print(json.dumps(result, ensure_ascii=False))
 
 
 if __name__ == "__main__":

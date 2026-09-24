@@ -1,0 +1,27 @@
+{
+  "model_version": "claim_risk_model_v001",
+  "population": "bounded_held_out_test",
+  "threshold": 0.5,
+  "first_run": {
+    "run_id": "88b2133f-71aa-42c0-92d3-3639b67bb779",
+    "expected_rows": 20000,
+    "predicted_rows": 20000,
+    "stored_rows": 20000,
+    "difference_expected_to_stored": 0,
+    "duplicate_source_identity_rows": 0,
+    "scoring_seconds": 0.092709,
+    "scored_at_utc": "2026-09-23T06:12:13+00:00"
+  },
+  "idempotency_rerun": {
+    "run_id": "e800b561-9eb7-4819-bcc3-2ffd10edcfc1",
+    "expected_rows": 20000,
+    "predicted_rows": 20000,
+    "stored_rows": 20000,
+    "difference_expected_to_stored": 0,
+    "duplicate_source_identity_rows": 0,
+    "scoring_seconds": 0.089616,
+    "scored_at_utc": "2026-09-23T06:13:02+00:00"
+  },
+  "post_rerun_distinct_scoring_run_ids_in_stored_rows": 1,
+  "idempotency_policy": "SourceFile + SourceRowNumber + ScoringPopulation + ModelVersion is unique. A rerun updates the existing row rather than inserting a duplicate."
+}

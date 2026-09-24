@@ -18,6 +18,7 @@ Mã nguồn Python của dự án được tổ chức theo các thư mục ch�
 - Mỗi module và hàm public phải có docstring rõ ràng, type hints đầy đủ và trách nhiệm đơn nhất.
 - Tuyệt đối không để print debug bừa bãi, mã chết (dead code), import thừa, đường dẫn tuyệt đối gắn cứng vào máy cá nhân hoặc seed ngẫu nhiên ngầm định.
 - Tách biệt rõ ràng các giai đoạn: trích xuất feature, tiền xử lý, huấn luyện, đánh giá và xuất kết quả thành các hàm/module độc lập có thể kiểm thử.
+- Mỗi module đọc dữ liệu phải ghi rõ Track A/B/C và chỉ dùng contract của track đó. Không đọc/join SUSEP, brvehins1 hoặc Prudential chéo track nếu không có relationship evidence được phê duyệt.
 - Tránh rò rỉ dữ liệu (Data Leakage): Không bao giờ fit imputer, encoder, scaler hoặc feature selector trên toàn bộ tập dữ liệu trước khi train-test split.
 - Không commit dữ liệu thô lớn hoặc binary model artifact vào Git; sử dụng đường dẫn tương đối hoặc biến môi trường/cấu hình tập trung.
 - Trước khi commit, luôn chạy kiểm tra cú pháp và biên dịch tối thiểu: `python -m py_compile <file_path>`.

@@ -115,6 +115,8 @@ Foundation milestone — `P1-DATA-01` là stage kế tiếp. Không có subsyste
 
 `P1-DATA-01`: thực hiện EDA streaming có bằng chứng về row count, null, duplicate, range, cardinality, phân bố claim/premium/exposure và grain assessment; không sửa raw.
 
+| 2026-09-23 | AUTO-ML-ORCH | P1-AUTO-ML-01 đến P1-ML-05 / P1-ORCH-01 đang triển khai | `ml/modeling.py`; `ml/train_risk_model.py`; `ml/predict_risk_batch.py`; `migrations/V10__create_risk_observation_predictions.sql`; `airflow/`; DAG | repository root | BLOCKED | CDC, ML contract và dataset split evidence đã có; maintained ML/Airflow code và V10 are scaffolded/static-validated. Full 1,965,355-row model training was interrupted/stopped after excessive runtime/resource use; no model artifact, prediction reconciliation, or Airflow runtime evidence exists yet. Raw CSV unchanged; no commit/push. |
+
 | 2026-09-22 | DATA | P1-DATA-01: EDA streaming và source profiling thực tế | profiler, notebook, JSON/CSV/Markdown evidence, checkpoint | `scripts/profile_brvehins1.py`; `notebooks/01-eda.ipynb`; `reports/data/`; `reports/checkpoints/P1-DATA-01.md` | DONE | 1,965,355 dòng, schema 23 cột đồng nhất, 14 exact duplicate logical rows, `HasClaim` 363,076; raw không đổi; static validator 40 PASS, 0 FAIL; next: P1-DATA-02. |
 
 ## Giai đoạn hiện tại
@@ -209,3 +211,35 @@ Foundation milestone — `P1-DWH-03` là stage kế tiếp. Ba dimension đã `R
 | 2026-09-22 | DQ | P1-DQ-01/02/03: executable quality gate và controlled failure | V8 migration, DQ entry point, checkpoints | `migrations/V8__create_data_quality_gate.sql`; `sql/07_run_quality_gate.sql`; `reports/checkpoints/P1-DQ-01.md`; `reports/checkpoints/P1-DQ-02.md`; `reports/checkpoints/P1-DQ-03.md` | RUNTIME_PASS | Production hard rules PASS; controlled invalid input ghi FAIL và SQL error 51040, không đổi dữ liệu; production rerun PASS. |
 
 | 2026-09-22 | FOUNDATION | P1-AUTO-FOUNDATION-01 hoàn tất | final report, toàn bộ checkpoint | `reports/foundation-50pct-report.md`; `reports/checkpoints/` | DONE | Final validation: 55 PASS, 0 FAIL, 8 runtime-scope SKIPPED; SQL Server, staging, DWH và DQ có runtime evidence. Không triển khai CDC/ML/Airflow/Performance/BI. |
+| 2026-09-23 | ML | P1-ML-02 đến P1-ML-05: baseline có giới hạn tài nguyên, so sánh, artifact, batch scoring | `ml/modeling.py`; `ml/train_risk_model.py`; `ml/predict_risk_batch.py`; V10; artifact/evidence/checkpoint/report | `ml/`; `migrations/V10__create_risk_observation_predictions.sql`; `reports/` | RUNTIME_PASS | Sau lần full-frame trước chạm khoảng 0.92 GB working set và bị dừng, dùng population deterministic 100,004 rows, sparse OHE float32, single-process SGD/ComplementNB, progressive 4k/24k/60k. Chọn `claim_risk_model_v001` (held-out test ROC-AUC 0.808815, PR-AUC 0.513523); scoring test 20,000 rows SQL difference 0, rerun idempotent. Không triển khai Airflow/Performance/BI; raw không đổi, không commit/push. |
+| 2026-09-23 | ARCH | P1-ARCH-REALIGN-01: căn chỉnh Insurance Data Platform đa track | current docs, source strategy, roadmap, validator, rules, checkpoint | `README.md`; `docs/`; `.cursor/rules/`; `scripts/validate_repo.py`; `reports/checkpoints/P1-ARCH-REALIGN-01.md` | DONE | Khôi phục SUSEP là Track A active canonical cho Market DWH/Performance; giữ brvehins1 Track B runtime-validated; Prudential là planned/not present; cấm fake row-level join. Static validation: 67 PASS, 0 FAIL, 9 runtime-scope SKIPPED. Không sửa raw, không triển khai SUSEP/Airflow/Performance/BI, không commit/push. |
+
+## Giai đoạn hiện tại
+
+P1-ARCH-REALIGN-01 đã realign current source-of-truth. Track B giữ evidence runtime; Track A SUSEP mới có physical source/header static validation, chưa có DWH runtime.
+
+## Việc tiếp theo cần làm
+
+P1-SUSEP-01: thực hiện streaming EDA và source contract trên actual SUSEP CSV; xác nhận exact row count, grain, key/duplicate/null/range policy, month và premium/claims/ratio semantics trước mọi DDL, staging hoặc ETL.
+
+## Cập nhật hiện tại — 2026-09-24 — P1-AUTO-FINALIZE-02
+
+| Thời gian | Giai đoạn | Việc đã làm | File chính tạo/sửa | Trạng thái | Evidence / ý nghĩa |
+|---|---|---|---|---|---|
+| 2026-09-24 | Preflight + Track A | Hoàn tất SUSEP EDA/contract, streaming ingestion, market DWH, reconciliation, DQ và performance tuning | `docs/susep/*`; V11–V13; `scripts/load_susep_to_staging.py`; `scripts/reconcile_susep_source_to_fact.py`; `P1-SUSEP-*`; `P1-PERF-*`; `reports/performance-report.md` | RUNTIME_PASS | Raw=staging=fact=8.338.214; premium/claims source=staging=fact; production DQ 14 hard rules PASS; Q1 317.528→3.364 reads, Q2 317.528→3.734; raw không đổi. |
+| 2026-09-24 | Airflow | Sửa image/dependency/DAG thành hai route độc lập và sửa propagation SQL `THROW` | `airflow/*`; `docker-compose.yml`; `dags/insurance_dwh_pipeline.py`; `P1-ORCH-01/02.md` | RUNTIME_PASS | Valid run `44294f58-1808-4cd8-8a22-2c90687bf321`: 12/12 success. Controlled run `0d2f017a-1f52-46b2-9671-2f1e3d95f488`: Track-A DQ failed, consumer A upstream_failed, consumer B success. |
+| 2026-09-24 | E2E | Fresh venv dependency/artifact test và safe failure-path test | `P1-E2E-01.md`; `P1-E2E-02.md` | PASS | Fresh venv install requirements + reload sklearn 1.7.2 Pipeline PASS; missing path/header, unavailable SQL port, duplicate rerun và DQ/Airflow failure đều có expected safe behavior. |
+| 2026-09-24 | Docs + audit | Hoàn thiện Vietnamese final guide, final report, current architecture diagrams, semantic handoff, source/roadmap/run docs và validator | `FINAL_PROJECT_GUIDE.md`; `reports/final-project-report.md`; `docs/architecture/overall-architecture.md`; `docs/bi/semantic-model.md`; `powerbi/README.md`; `scripts/validate_repo.py` | PASS except BI artifact | 8 Mermaid diagram types; final learning guide có 30 Q&A; stale current claims đã sửa, historical evidence giữ nguyên. |
+| 2026-09-24 | Final validation | Chạy static/runtime final checks, không sửa raw, không commit/push | validator, SQL/Airflow checks, Docker Compose, Git checks | BLOCKED_MANUAL | `96 PASSED | 0 FAILED | 9 SKIPPED`; py_compile PASS; Compose config PASS; diff --check PASS (chỉ CRLF warning); SQL/DQ/reconciliation/prediction smoke PASS. Power BI `.pbix`/refresh thiếu GUI/PBIP toolchain nên final verdict BLOCKED. |
+
+### Snapshot cuối phiên
+
+- Current runtime: SQL Server và Airflow `Up`; Track A và Track B không có fake join.
+- Track B smoke: staging=fact=1.965.355; prediction=20.000; duplicate=0; production DQ PASS.
+- Track A final production DQ: hard failure count=0; latest direct reconciliation `SUCCESS`.
+- Git: `29 modified`, `59 untracked` (bao gồm pre-existing user work và artifact/checkpoint của task); không reset/clean/stash/restore/commit/push.
+- Việc còn lại duy nhất để đổi verdict: dùng Power BI Desktop hoặc approved PBIP toolchain tạo artifact thật, refresh và đối soát hai subject area disconnected.
+
+| 2026-09-24 | PERF reproducibility correction | Thêm migration idempotent cho hai performance index retained và apply vào SQL Server | `migrations/V14__add_susep_performance_indexes.sql`; validator; performance docs | RUNTIME_PASS | `V14=1`; cả `IX_FactSusepInsuranceMarket_CompanyMonth_Perf` và `IX_FactSusepInsuranceMarket_StateProductMonth_Perf` tồn tại. Final static validator sau V14: `98 PASSED | 0 FAILED | 9 SKIPPED`; dòng 96 PASS ở snapshot trước là kết quả trước khi thêm V14. |
+
+- Git recount sau V14: `29 modified`, `60 untracked`; vẫn không có commit/push hay destructive Git action.

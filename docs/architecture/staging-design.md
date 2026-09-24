@@ -1,4 +1,4 @@
-# Thiết kế staging canonical — brvehins1
+# Thiết kế staging Track B — brvehins1
 
 Trạng thái: `RUNTIME_PASS` cho cấu trúc table và cả năm partition sau `P1-INGEST-03`; staging chứa 1,965,355 source rows có đối soát.
 

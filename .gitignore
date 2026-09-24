@@ -35,6 +35,16 @@ wheels/
 .installed.cfg
 *.egg
 
+# Runtime ML artifacts are reproducible locally but binary outputs do not belong in Git.
+ml/artifacts/*
+!ml/artifacts/.gitkeep
+
+# Local orchestration/runtime output; keep checkpoints and reports, exclude live logs.
+log/scheduler/
+log/dag_processor_manager/
+log/dag_id=*/
+reports/data/*.log
+
 .cursor/*
 !.cursor/rules/
 !.cursor/rules/**
@@ -58,6 +68,7 @@ Desktop.ini
 
 # Personal
 roadmap.md
+!docs/specs/roadmap.md
 
 # Personal agent-session history; intentionally local only.
 AGENT_PROMPT_HISTORY.md

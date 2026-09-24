@@ -1,42 +1,29 @@
-# Kiến trúc hiện hành của nền tảng dữ liệu
+# Kiến trúc hiện hành của Insurance Data Platform là gì?
 
-## Mục tiêu
-
-Dự án xây dựng Motor Insurance Data Warehouse cho dữ liệu `brvehins1`. Nền tảng phục vụ phân tích premium, exposure, giá trị bảo hiểm và claim theo đặc tính người lái, xe và địa lý. Đây là nền tảng dữ liệu trước khi mở rộng sang orchestration, ML, tối ưu hiệu năng và Power BI.
-
-## Nguồn chuẩn và ranh giới dữ liệu
-
-`data/raw/brvehins1/` chứa đúng năm file CSV chuẩn. Raw không được thay đổi, chuẩn hóa hay ghi đầu ra vào lại. File `data/raw/susep.gov.br/insurance_dataset.csv` được phân loại **LEGACY / NON-CANONICAL** và nằm ngoài mọi bước ingest, DWH và DQ hiện hành.
-
-## Luồng đích
+Project có hai canonical source đang hoạt động theo hai track độc lập: SUSEP cho Market DWH/Performance và brvehins1 cho Motor Risk/ML. `canonical` ở đây giống “nguồn chuẩn của quầy hàng”: nó áp dụng trong đúng track, không biến một dataset thành chủ nhân của toàn repository.
 
 ```text
-Raw brvehins1
-  -> import tạm theo partition
-  -> staging có BatchId, SourceFile, SourceRowNumber và SourceRecordHash
-  -> dimensions được suy ra từ các nhóm thuộc tính thực có trong nguồn
-  -> fact ở đúng grain của một bản ghi nguồn
-  -> data-quality gate và đối soát raw -> staging -> fact
+Track A — SUSEP: raw market CSV → `stg.SusepInsuranceMarket` → market DWH → DQ → performance
+                                      → Performance Tuning / Market BI
+
+Track B — brvehins1: raw CSV → stg.BrVehIns1 → dimensions + FactRiskObservation
+                                      → DQ → bounded ML → RiskObservationPrediction
 ```
 
-Mỗi batch phải được ghi metadata, đối soát số dòng và có hành vi idempotent khi chạy lại cùng file. Khóa nhận diện nguồn là kỹ thuật; nó không được trình bày như một mã nghiệp vụ của khách hàng hoặc hợp đồng.
+SUSEP và brvehins1 không có proven row-level relationship. Không tạo `CustomerId`, `PolicyId` hoặc mapping giả để nối chúng. Điều này không hạn chế hai track cùng chạy trên SQL Server hay cùng được Airflow điều phối độc lập; nó chỉ bảo vệ grain và tính trung thực của dữ liệu.
 
-## Quyết định đã đóng băng sau EDA
+## Track B đã chứng minh những gì?
 
-- Grain là một source-delivered aggregate risk observation, không phải policy/customer/event cá thể.
-- Technical identity là `SourceFile + SourceRowNumber`; 14 dòng logic trùng vẫn được preserve.
-- Nullable, duplicate, invalid-value và partition semantics được quy định tại `source-data-contract.md`.
-- Các metric dẫn xuất xử lý mẫu số bằng 0 bằng `NULL`, không infinity.
-- Không có SCD2 thật nếu nguồn không có lịch sử thay đổi của một business entity.
+Track B là implementation runtime-validated: năm brvehins1 partitions đã vào `stg.BrVehIns1`; `DimDriverProfile`, `DimVehicle`, `DimGeography` và `FactRiskObservation` đã reconcile 1,965,355 rows; DQ production pass. ML đã train/score một deterministic bounded population đúng theo contract, không phải future customer/policy prediction. Chi tiết ở [dwh-design.md](dwh-design.md) và [../ml/ml-data-contract.md](../ml/ml-data-contract.md).
 
-## Trạng thái mã hiện có
+## Track A được xây dựa trên cái gì?
 
-| Khu vực | Trạng thái | Cách xử lý |
-|---|---|---|
-| `migrations/V1__create_dwh_schema.sql` | RUNTIME_PASS | Bootstrap idempotent đã tạo database, schemas `meta/stg/dwh/dq`, manifest và audit metadata. |
-| `sql/` và migration business kế tiếp | STALE SCAFFOLD — REQUIRES REFACTOR | Thay bằng staging, DWH và DQ dựa trên source contract. |
-| `ml/` và `dags/` | STALE SCAFFOLD — REQUIRES REFACTOR | Không dùng làm bằng chứng runtime; hoãn đến sau DQ. |
-| `docker-compose.yml` | RUNTIME_PASS cho SQL Server | `insurance_sqlserver` đang chạy; Airflow nằm trong profile deferred. |
-| `notebooks/01-eda.ipynb` | RUNTIME_PASS | EDA thực tế đã tạo evidence trong `reports/data/`. |
+CSV SUSEP có các field market-level thực tế: company, `year_month`, product, state, premiums, claims và `claim_premium_ratio`. Nó là `ACTIVE_CANONICAL` của Track A. P1-SUSEP-01..05 đã có runtime evidence cho full-file contract, staging, one-observation fact, raw-to-fact reconciliation và DQ; xem [source-data-contract](../susep/source-data-contract.md).
 
-Chi tiết về các cột nguồn được quản lý tại [data-dictionary.md](data-dictionary.md) và source contract chính thức nằm tại [source-data-contract.md](source-data-contract.md).
+## Các file SQL lịch sử có ý nghĩa gì?
+
+Scaffold `Dim_Customer`, `Dim_Policy`, `Fact_Premium`/`Fact_Claims` và SCD2 cũ không phải evidence để chạy Track A hay Track B. Chúng được giữ như lịch sử và đánh dấu `STALE_SCAFFOLD`; model SUSEP hiện hành đã xuất phát từ CSV thật, không từ comment cũ. Historical reports vẫn giữ nguyên số liệu theo thời điểm được tạo.
+
+## Tôi nên đọc tiếp ở đâu?
+
+Đọc [project-scope.md](project-scope.md), rồi [source-strategy.md](source-strategy.md). Khi muốn hiểu implementation đang chạy, đi theo Track A (`docs/susep/`) hoặc Track B (`source-data-contract.md` → `staging-design.md` → `dwh-design.md` → `docs/ml/ml-data-contract.md`).

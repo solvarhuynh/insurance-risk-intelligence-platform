@@ -1,0 +1,36 @@
+{
+  "population_strategy": {
+    "positive_hash_groups": 18474,
+    "negative_hash_groups": 81526,
+    "purpose": "resource-bounded reproducible model comparison and held-out batch inference demonstration"
+  },
+  "total_rows": 100004,
+  "total_source_hashes": 100000,
+  "duplicate_hash_excess": 4,
+  "split_strategy": "StratifiedGroupKFold(5); fold 0 test, fold 1 validation, folds 2-4 train",
+  "random_seed": 20260923,
+  "source_identity_crosses_split": false,
+  "splits": {
+    "train": {
+      "rows": 60002,
+      "positive_rows": 11025,
+      "negative_rows": 48977,
+      "positive_rate": 0.18374387520415986,
+      "distinct_source_hashes": 60000
+    },
+    "validation": {
+      "rows": 20002,
+      "positive_rows": 3680,
+      "negative_rows": 16322,
+      "positive_rate": 0.18398160183981602,
+      "distinct_source_hashes": 20000
+    },
+    "test": {
+      "rows": 20000,
+      "positive_rows": 3769,
+      "negative_rows": 16231,
+      "positive_rate": 0.18845,
+      "distinct_source_hashes": 20000
+    }
+  }
+}

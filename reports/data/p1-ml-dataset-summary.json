@@ -1,0 +1,33 @@
+{
+  "total_rows": 1965355,
+  "total_source_hashes": 1965323,
+  "duplicate_hash_excess": 32,
+  "split_strategy": "StratifiedGroupKFold(5); fold 0 test, fold 1 validation, folds 2-4 train",
+  "random_seed": 20260923,
+  "source_identity_crosses_split": false,
+  "splits": {
+    "train": {
+      "rows": 1179210,
+      "positive_rows": 217476,
+      "negative_rows": 961734,
+      "positive_rate": 0.18442516600096676,
+      "distinct_source_hashes": 1179194
+    },
+    "validation": {
+      "rows": 393073,
+      "positive_rows": 73138,
+      "negative_rows": 319935,
+      "positive_rate": 0.18606721906617854,
+      "distinct_source_hashes": 393065
+    },
+    "test": {
+      "rows": 393072,
+      "positive_rows": 72462,
+      "negative_rows": 320610,
+      "positive_rate": 0.184347905727195,
+      "distinct_source_hashes": 393064
+    }
+  },
+  "extracted_at_utc": "2026-09-23T03:32:09+00:00",
+  "data_contract": "docs/ml/ml-data-contract.md"
+}

@@ -1,14 +1,9 @@
-# Tóm tắt Performance Tuning
+# Performance Tuning sẽ chứng minh điều gì?
 
-Trạng thái: Chờ Giai đoạn 7.
+Trạng thái: future; chưa có benchmark được chứng nhận.
 
-Chưa có truy vấn nghiệp vụ đã chạy trên dữ liệu thật, Execution Plan, hoặc số đo `STATISTICS IO, TIME`; vì vậy chưa có kết quả before/after đáng tin cậy để tóm tắt.
+Trọng tâm P1-PERF là **Track A — SUSEP Market DWH** sau khi source contract, ingestion, dimensional model và DQ đã runtime-pass. Đây là nơi source có quy mô market lớn phù hợp để đo workload SQL Server thật.
 
-Khi Giai đoạn 7 hoàn thành, bổ sung cho từng truy vấn:
+Mỗi experiment phải ghi business question, query text, data scale, execution plan, STATISTICS IO/TIME, index/physical change, before/after result và write/storage trade-off. Không được gọi performance pass chỉ vì index hoặc SQL file tồn tại.
 
-1. Câu hỏi nghiệp vụ mà truy vấn trả lời.
-2. Điểm nghẽn thấy trong Execution Plan trước tối ưu, ví dụ Table Scan hoặc Key Lookup.
-3. Index đã chọn và lý do chọn cột khoá/cột `INCLUDE`.
-4. So sánh logical reads, CPU time và elapsed time trước/sau, cùng quy mô dữ liệu và điều kiện đo.
-5. Trade-off: chi phí lưu trữ và chi phí ghi dữ liệu do index tạo thêm.
-
+Track B có thể có risk analytics query riêng, nhưng benchmark của nó không thay thế market-performance evidence. Không làm performance tuning trong P1-ARCH-REALIGN-01.

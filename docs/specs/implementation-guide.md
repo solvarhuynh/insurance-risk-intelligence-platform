@@ -1,38 +1,44 @@
-# Hướng dẫn triển khai nền tảng Motor Insurance DWH
+# Tôi triển khai Insurance Data Platform theo nguyên tắc nào?
 
-## Mục tiêu hiện hành
+## Mục tiêu hiện hành là gì?
 
-Xây dựng nền tảng dữ liệu có thể kiểm chứng cho dataset chuẩn `brvehins1`: raw bất biến, staging theo batch, data contract, DWH dimensional, đối soát và Data Quality gate. SQL Server là runtime đích. Các phần orchestration, ML, performance tuning và Power BI chỉ bắt đầu khi foundation đã có bằng chứng runtime.
+Project xây nền tảng dữ liệu bảo hiểm nhiều track, không phải một warehouse duy nhất giả vờ có chung customer/policy identity. Mục tiêu ưu tiên là:
 
-## Nguồn chuẩn
+1. Track A: SUSEP Market DWH để phục vụ ingestion lớn, DQ, Performance Tuning và Market BI.
+2. Track B: bảo toàn risk DWH và ML runtime-validated từ brvehins1.
+3. Track C: Prudential chỉ được triển khai khi physical source có mặt và có contract riêng.
 
-`data/raw/brvehins1/` chứa năm partition CSV có schema 23 cột đồng nhất. `data/raw/susep.gov.br/insurance_dataset.csv` là **LEGACY / NON-CANONICAL** và không được đưa vào bất kỳ bước canonical nào.
+## Quy tắc model nào không được vi phạm?
 
-## Nguyên tắc thiết kế
+- Bắt đầu từ physical schema và source contract, không từ table name cũ.
+- Một fact chỉ được mô tả ở grain mà source chứng minh.
+- Same business domain không tạo ra same row identity.
+- Không tạo CustomerId, PolicyId, customer mapping hoặc claim-event grain giả.
+- Không dùng code/comment historical scaffold làm specification.
+- Chỉ gọi RUNTIME_PASS khi lệnh, environment, input, output và evidence đã tồn tại.
 
-- Không sửa raw và không suy diễn cột không có trong nguồn.
-- Không tạo business identifier khi data contract không chứng minh có identifier đó.
-- Khóa kỹ thuật phải truy vết được về file nguồn, dòng nguồn và batch.
-- Mỗi stage chỉ đạt `RUNTIME_PASS` khi có lệnh, đầu vào, đầu ra và bằng chứng thực tế.
-- Chạy lại batch phải được kiểm tra idempotency, không chỉ được giả định.
-- Hard DQ rule phải chặn pipeline; quan sát đáng ngờ nhưng chưa có contract là warning hoặc business review.
+## Track A sẽ được triển khai theo thứ tự nào?
 
-## Lộ trình foundation
+P1-SUSEP-01 profile CSV theo streaming: exact row count, header/types, uniqueness, null/range, refresh/time, premium/claim/ratio semantics và candidate grain.
 
-| Stage | Mục tiêu | Bằng chứng tối thiểu |
-|---|---|---|
-| P1-WF-04 | Chuẩn hóa nguồn và validator | Năm file, schema bằng nhau, current docs không hướng dẫn kiến trúc cũ. |
-| P1-DATA-01 | EDA thực tế | DONE: row count, null, duplicate, range, distribution và grain assessment. |
-| P1-DATA-02 | Source data contract | DONE: 23 cột, SQL mapping, technical key, policy null/duplicate/invalid. |
-| P1-INFRA | SQL Server và bootstrap | DONE: container, kết nối, database, schemas và migration rerun an toàn. |
-| P1-INGEST | Staging và batch load | Năm batch, đối soát, metadata và idempotency. |
-| P1-DWH | Dimensions và fact | Grain chính xác, FK hợp lệ và staging-to-fact reconciliation. |
-| P1-DQ | Quality gate | Hard rules pass và controlled invalid input fail an toàn. |
+P1-SUSEP-02 tạo staging ingest có lineage, batch metadata và reconciliation dựa trên contract đã freeze.
 
-## Artifact cũ
+P1-SUSEP-03 tạo dimensional design theo fields thật. Candidate hiện tại là month, company, product, geography và market-observation fact; đây không phải DDL đã được chấp thuận.
 
-Các file SQL, ML và DAG có từ trước ở trạng thái **STALE SCAFFOLD — REQUIRES REFACTOR**. Chúng được giữ lại để thay thế có kiểm soát trong từng stage; nội dung của chúng không xác định mô hình nghiệp vụ hiện tại.
+P1-SUSEP-04 load fact/dimension và chứng minh reconciliation/idempotency.
 
-## Definition of Done của foundation
+P1-SUSEP-05 tạo DQ executable. Chỉ khi đó P1-PERF mới đo execution plan, STATISTICS IO/TIME và index experiment trên workload market.
 
-Foundation chỉ `DONE` khi năm partition được nạp qua một đường ingest có đối soát, DWH có fact và dimensions dựa trên contract thực, DQ pass trên dữ liệu production và quality gate dừng được input lỗi có kiểm soát. Báo cáo checkpoint và `log/progress-log.md` phải ghi đúng bằng chứng từng stage.
+## Track B được giữ như thế nào?
+
+Track B giữ nguyên brvehins1 raw, stg.BrVehIns1, DimDriverProfile, DimVehicle, DimGeography, FactRiskObservation, DQ, incremental/CDC demo, ML contract, model artifact, RiskObservationPrediction và scoring idempotency. Không đổi grain để ép nó vào SUSEP.
+
+ML Track B là HasClaim association cross-sectional cho aggregate risk observation. Nó không được tái diễn giải thành market prediction hay customer-level forecast.
+
+## Các file SQL cũ phải được xử lý thế nào?
+
+Các scaffold Dim_Customer, Dim_Policy, Fact_Premium, Fact_Claims và SCD2 cũ không được chạy hay nâng cấp trực tiếp. P1-SUSEP-01 sẽ quyết định replacement dựa trên actual CSV. Việc giữ file lịch sử không tạo authorization để invent entities.
+
+## Roadmap chuẩn ở đâu?
+
+Đọc docs/specs/roadmap.md. Tài liệu này thay thế các roadmap cũ tập trung vào Motor Insurance-only. Chi tiết source status nằm tại docs/architecture/source-strategy.md.

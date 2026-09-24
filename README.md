@@ -1,75 +1,93 @@
-# Motor Insurance Data Warehouse
+# Insurance Data Platform
 
-Đây là dự án cá nhân xây dựng nền tảng Data Warehouse cho phân tích phí bảo hiểm, mức độ phơi nhiễm rủi ro và bồi thường xe cơ giới tại Brazil. Nền tảng đích dùng SQL Server, có staging theo batch, kiểm tra chất lượng dữ liệu, mô hình dimensional và các bước mở rộng sau này như điều phối, tối ưu hiệu năng, Machine Learning và Power BI.
+## Data Warehouse, Performance Tuning, Risk Analytics & Machine Learning
 
-## Nguồn dữ liệu chuẩn
+Project này được xây để chứng minh năng lực Data Engineering trên SQL Server, với trọng tâm Data Warehouse, ETL, Data Quality và Performance Tuning, sau đó mở rộng thêm Risk Analytics và Machine Learning.
 
-Nguồn duy nhất của pipeline hiện tại là `brvehins1` trong `data/raw/brvehins1/`:
+Repository có nhiều **analytical track** — các luồng phân tích riêng trong cùng business domain bảo hiểm. Dùng cùng platform không có nghĩa dữ liệu của chúng có thể join theo từng row.
 
-- `brvehins1a.csv`
-- `brvehins1b.csv`
-- `brvehins1c.csv`
-- `brvehins1d.csv`
-- `brvehins1e.csv`
+## Project có những track nào?
 
-Năm phân vùng có cùng header gồm 23 cột về người lái, xe, địa lý, exposure, phí, giá trị bảo hiểm, số vụ và số tiền bồi thường. Tổng số dòng đã được kiểm đếm ở mức file là 1,965,355 dòng; EDA sẽ xác minh và mô tả đầy đủ các đặc tính dữ liệu trước khi thiết kế database.
+| Track | Canonical source | Mục đích | Trạng thái hiện tại |
+|---|---|---|---|
+| A — SUSEP Market | **data/raw/susep.gov.br/insurance_dataset.csv** | Market DWH, Performance Tuning, Market Power BI | RUNTIME_PASS: EDA → staging → market DWH → reconciliation → DQ; performance indexes có evidence |
+| B — brvehins1 Motor Risk | **data/raw/brvehins1/brvehins1[a-e].csv** | Motor risk DWH, risk analytics, bounded ML | RUNTIME_PASS trong boundary Track B |
+| C — Prudential Life Underwriting | Không có file physical | Future underwriting analytics | ORIGINAL_PLANNED_SOURCE / NOT_PRESENT |
 
-`data/raw/susep.gov.br/insurance_dataset.csv` là dữ liệu **LEGACY / NON-CANONICAL**. File được bảo toàn để tham chiếu lịch sử, không được join, stage hoặc dùng trong pipeline chuẩn.
+SUSEP và brvehins1 đều là ACTIVE_CANONICAL trong track của mình. Prudential là ý định nguồn gốc, không phải dependency hiện tại.
 
-## Kiến trúc mục tiêu
+## Vì sao không được join hai track active?
 
-```text
-Raw CSV bất biến
-    -> Staging theo batch có metadata và đối soát
-    -> Dimension và Fact dựa trên grain thực tế
-    -> Data Quality gate
-    -> Các giai đoạn sau: orchestration, ML, tuning, Power BI
-```
+**Row identity** — căn cước của một dòng — chỉ tồn tại khi source có key/relationship thật. SUSEP là market observation theo company/time/product/state; brvehins1 là aggregate motor-risk observation. Không có customer, policy hay source mapping được chứng minh giữa chúng.
 
-Thiết kế chỉ được chốt sau EDA và source data contract. Dataset không có mã định danh khách hàng hoặc hợp đồng đã được chứng minh; dự án không được tự tạo business identifier. Nếu cần nhận diện kỹ thuật, hệ thống sẽ dùng khóa kỹ thuật có lineage về file nguồn và dòng nguồn.
+Vì vậy không được tạo CustomerId, PolicyId, mapping hay fact chung giả. Hãy xem [source strategy](docs/architecture/source-strategy.md) trước khi thiết kế integration.
 
-## Trạng thái hiện tại
+## Kiến trúc được tổ chức ra sao?
 
-| Phân hệ | Trạng thái | Ghi chú |
-|---|---|---|
-| Raw `brvehins1` | STATIC_PASS | Có đủ năm file, header đồng nhất; raw là bất biến. |
-| Governance và validation | DONE | `P1-WF-04` chuẩn hóa tài liệu và static validator. |
-| EDA | RUNTIME_PASS | Profile streaming đã tạo bằng chứng cho toàn bộ 1,965,355 dòng. |
-| Data contract | DONE | 23 cột, grain, technical identity và policy DQ đã được đóng băng. |
-| Docker và SQL Server | RUNTIME_PASS | Container `insurance_sqlserver` chạy và `sqlcmd` kết nối thành công. |
-| Migration bootstrap | RUNTIME_PASS | `V1__create_dwh_schema.sql` tạo `DWH_Insurance`, schemas/meta tables và rerun an toàn. |
-| Staging | RUNTIME_PASS | Năm partition đã nạp: 1,965,355 rows, batch metadata và rerun idempotent có bằng chứng. |
-| DWH, DQ | STALE SCAFFOLD — REQUIRES REFACTOR | Chưa có dimensional model/fact/DQ gate thực; sẽ được thay theo contract. |
-| ML và Airflow | STALE SCAFFOLD — REQUIRES REFACTOR | Được hoãn đến sau nền tảng DWH và DQ. |
-| Performance và Power BI | SCAFFOLD | Chờ dữ liệu DWH thực tế. |
+~~~mermaid
+flowchart TB
+    P[Insurance Data Platform]
+    P --> A[Track A: SUSEP Market DWH]
+    P --> B[Track B: brvehins1 Motor Risk / ML]
+    P -. planned .-> C[Track C: Prudential Life Underwriting]
 
-`STATIC_PASS` chỉ xác nhận kiểm tra tĩnh. `RUNTIME_PASS` chỉ được dùng khi lệnh đã chạy thành công với dữ liệu và bằng chứng thực tế.
+    A --> A1[Market staging → market DWH → DQ]
+    A1 --> A2[Performance Tuning / Market BI]
+    B --> B1[stg.BrVehIns1 → risk DWH → DQ]
+    B1 --> B2[Bounded ML → RiskObservationPrediction]
 
-## Kiểm tra tĩnh
+    O[Airflow orchestration boundary] -. điều phối từng track .-> A
+    O -. điều phối từng track .-> B
+~~~
 
-Từ thư mục gốc repository, chạy:
+Airflow đã chạy runtime hai nhánh độc lập: SUSEP ingest → DWH → reconciliation → DQ và brvehins1 foundation → DQ → scoring → prediction reconciliation. Power BI semantic model/handoff đã hoàn tất, nhưng dashboard `.pbix`/refresh thật cần Power BI Desktop hoặc PBIP toolchain nên được đánh dấu `BLOCKED_MANUAL`, không bị giả lập.
 
-```powershell
-python scripts/validate_repo.py
-python -m py_compile scripts/validate_repo.py ml/train_risk_model.py ml/predict_risk_batch.py dags/insurance_dwh_pipeline.py
+## Các track đã chạy thật đến đâu?
+
+- **Track A — SUSEP:** 8.338.214 source rows = staging rows = market fact rows; premium/claims source→staging→fact reconcile; production DQ 14 hard rules PASS; hai query performance giảm logical reads khoảng 98,8–98,9% sau index có bằng chứng.
+
+- Năm brvehins1 partition đã ingest vào **stg.BrVehIns1**.
+- **DimDriverProfile**, **DimVehicle**, **DimGeography** và **FactRiskObservation** đã reconcile 1,965,355 rows.
+- Production DQ gate đã pass.
+- **claim_risk_model_v001** là cross-sectional HasClaim association trên population deterministic 100,004 rows; nó không dự đoán claim tương lai của customer/policy.
+- Batch scoring held-out 20,000 rows vào **dwh.RiskObservationPrediction** đã reconcile difference 0 và rerun idempotent.
+
+Evidence runtime theo stage nằm trong `reports/checkpoints/`. Không một kết quả Track A/Track B nào là bằng chứng cho row-level relationship với track còn lại.
+
+## Tôi nên bắt đầu đọc ở đâu?
+
+1. [Project scope](docs/architecture/project-scope.md) để hiểu các track và quy tắc không fake join.
+2. [Source strategy](docs/architecture/source-strategy.md) để xem CSV thật, status và boundary giữa các source.
+3. [Final learning guide](FINAL_PROJECT_GUIDE.md) để đọc theo hướng người mới.
+4. Với implementation chạy thật: Track A contract → staging → market DWH; Track B contract → risk DWH → ML contract.
+5. Với lịch sử: file trong **reports/checkpoints/** và **reports/** là evidence theo thời điểm tạo, không phải kiến trúc hiện hành.
+
+## Tôi kiểm tra repository như thế nào?
+
+~~~powershell
+.\.venv\Scripts\python.exe scripts\validate_repo.py
+$pythonFiles = @(Get-ChildItem scripts -Filter *.py -File | ForEach-Object FullName) + @(Get-ChildItem ml -Filter *.py -File | ForEach-Object FullName) + @((Resolve-Path dags\insurance_dwh_pipeline.py))
+& .\.venv\Scripts\python.exe -m py_compile $pythonFiles
 docker compose config
 git diff --check
-```
+~~~
 
-Các lệnh trên không chứng minh SQL Server, DWH hay Airflow đang hoạt động. Hướng dẫn vận hành được cập nhật theo từng thành phần có bằng chứng runtime tại [docs/guides/how-to-run.md](docs/guides/how-to-run.md).
+Validator chỉ là **static validation**: nó kiểm tra file, header, syntax và cấu trúc. Nó không chứng minh SQL Server/DQ/ML runtime. Xem [run guide](docs/guides/how-to-run.md), [final report](reports/final-project-report.md) và checkpoints để phân biệt evidence runtime với static check.
 
-## Python dependencies
+## Roadmap đi tiếp theo hướng nào?
 
-Host Python dùng `requirements.txt` cho profiling và staging loader; `requirements-dev.txt` thêm validator/notebook tooling. Airflow không được cài vào host vì DAG chạy trong image Docker riêng. Chi tiết import audit, lý do và version pin ở [python-dependencies.md](docs/architecture/python-dependencies.md).
+~~~text
+P1-ARCH-REALIGN-01
+        ↓
+P1-SUSEP-01 … P1-SUSEP-05
+        ↓
+P1-PERF-01 … P1-PERF-03
+        ↓
+P1-ORCH-01 / P1-ORCH-02
+        ↓
+P1-BI-01 … P1-BI-03
+        ↓
+P1-E2E-* → P1-DOC-*
+~~~
 
-## Trình tự nền tảng
-
-1. `P1-WF-04`: chuẩn hóa nguồn chuẩn và validation.
-2. `P1-DATA-01`: EDA thực tế, profile và đánh giá grain.
-3. `P1-DATA-02`: đóng băng source data contract.
-4. `P1-INFRA`: khởi tạo SQL Server và metadata nền tảng.
-5. `P1-INGEST`: staging, đối soát và idempotency theo năm partition.
-6. `P1-DWH`: dimensions và fact dựa trên dữ liệu thực tế.
-7. `P1-DQ`: rule nguồn/staging, integrity kho dữ liệu và quality gate.
-
-Tài liệu kiến trúc hiện hành nằm trong `docs/architecture/`; tiến độ lịch sử chỉ được append tại [log/progress-log.md](log/progress-log.md).
+Chi tiết milestones và ranh giới implementation nằm tại [roadmap](docs/specs/roadmap.md).

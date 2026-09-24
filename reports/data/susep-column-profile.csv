@@ -1,0 +1,9 @@
+field,source_dtype_observed,suggested_sql_type,null_count,invalid_count,cardinality_excluding_null,min,max,negative_count,zero_count
+company_code,integer-like text,INT,0,0,196,,,,
+company_name,text,NVARCHAR(116),0,0,196,,,,
+year_month,ISO date text,DATE,0,0,,2003-01-01,2023-07-01,,
+product,text,NVARCHAR(42),0,0,144,,,,
+state,text,NVARCHAR(2),0,0,40,,,,
+premiums,decimal text,"DECIMAL(38,29)",0,0,,-224022539.61,2598854052.42,116980,5050114
+claims,decimal text,"DECIMAL(38,29)",0,0,,-4162417826.88,5323648483.83,301382,6547089
+claim_premium_ratio,decimal text or null sentinel,"DECIMAL(35,18)",5167094,0,,-6590560657819567,19804447419966428,238088,1613406

@@ -1,13 +1,13 @@
-# Source Data Contract — brvehins1
+# Source Data Contract — Track B brvehins1
 
 Trạng thái: `DONE` cho snapshot canonical được profile ngày 2026-09-22. Contract này là nguồn sự thật cho bootstrap SQL, staging, DWH và Data Quality foundation.
 
 ## 1. Ranh giới và raw immutability
 
-- Canonical input chỉ là năm file `brvehins1a.csv` đến `brvehins1e.csv` trong `data/raw/brvehins1/`.
+- Canonical input **của Track B** là năm file `brvehins1a.csv` đến `brvehins1e.csv` trong `data/raw/brvehins1/`.
 - Mỗi file có 393,071 dòng dữ liệu sau header; tổng 1,965,355 dòng; 23 cột theo dictionary.
 - Raw là immutable: không sửa CSV, không ghi output vào `data/raw/`, không deduplicate raw và không đưa raw vào Git.
-- `data/raw/susep.gov.br/insurance_dataset.csv` là **LEGACY / NON-CANONICAL**, không được ingest, join hoặc dùng làm fallback.
+- `data/raw/susep.gov.br/insurance_dataset.csv` là active canonical source của Track A. Nó không được ingest, join hoặc dùng làm fallback **trong Track B**, vì hai track không có row-level relationship được chứng minh.
 - Precision SQL phải preserve raw lexical value, không chỉ dtype `float64`: `ExposTotal` dùng `DECIMAL(21,17)` và `PremTotal` dùng `DECIMAL(34,27)` theo `reports/data/brvehins1-numeric-precision.json`; các mapping còn lại nằm ở dictionary.
 
 ## 2. Grain đã đóng băng

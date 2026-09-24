@@ -1,0 +1,53 @@
+{
+  "stage": "P1-INC-02",
+  "framing": "Synthetic CDC engineering demonstration; not brvehins1 source history.",
+  "executed_at_utc": "2026-09-23T02:51:01.234619+00:00",
+  "demo_run_id": "f82755d1-1082-4f93-9e85-20a582738675",
+  "updated_operational_record_id": 3,
+  "inserted_operational_record_id": 4,
+  "operation_counts": {
+    "2": 2,
+    "3": 1,
+    "4": 1
+  },
+  "captured_change_count": 4,
+  "captured_changes": [
+    {
+      "operation_code": 2,
+      "start_lsn": "0x000000d6000177780007",
+      "sequence_value": "0x000000d6000177780004",
+      "operational_record_id": 3,
+      "operational_status": "INITIAL",
+      "demo_note": "P1-INC-02 controlled initial row"
+    },
+    {
+      "operation_code": 3,
+      "start_lsn": "0x000000d6000177780007",
+      "sequence_value": "0x000000d6000177780005",
+      "operational_record_id": 3,
+      "operational_status": "INITIAL",
+      "demo_note": "P1-INC-02 controlled initial row"
+    },
+    {
+      "operation_code": 4,
+      "start_lsn": "0x000000d6000177780007",
+      "sequence_value": "0x000000d6000177780005",
+      "operational_record_id": 3,
+      "operational_status": "UPDATED",
+      "demo_note": "P1-INC-02 controlled update"
+    },
+    {
+      "operation_code": 2,
+      "start_lsn": "0x000000d6000177780007",
+      "sequence_value": "0x000000d6000177780006",
+      "operational_record_id": 4,
+      "operational_status": "INSERTED",
+      "demo_note": "P1-INC-02 controlled insert"
+    }
+  ],
+  "consumer": "p1-inc-02-demo-consumer",
+  "first_consume_new_rows": 4,
+  "second_consume_new_rows": 0,
+  "consumed_rows_for_demo": 4,
+  "watermark_last_start_lsn": "0x000000d6000177780007"
+}

@@ -1,0 +1,121 @@
+{
+  "timestamp_utc": "2026-09-23T06:05:35+00:00",
+  "extraction_and_split_seconds": 182.50476,
+  "progressive_baseline": [
+    {
+      "split": "validation",
+      "rows": 20002,
+      "positive_rows": 3680,
+      "positive_rate": 0.18398160183981602,
+      "roc_auc": 0.7569535383025312,
+      "average_precision": 0.4179437787922509,
+      "accuracy_at_0_5": 0.8184181581841816,
+      "precision_at_0_5": 0.5147058823529411,
+      "recall_at_0_5": 0.22826086956521738,
+      "f1_at_0_5": 0.31626506024096385,
+      "confusion_matrix_at_0_5": [
+        [
+          15530,
+          792
+        ],
+        [
+          2840,
+          840
+        ]
+      ],
+      "inference_seconds": 0.19489,
+      "inference_rows_per_second": 102632.46,
+      "probability_min": 3.880331860273145e-07,
+      "probability_max": 0.9967284202575684,
+      "model": "sgd_logistic_baseline",
+      "training_rows": 4000,
+      "training_positive_rate": 0.18375,
+      "training_seconds": 0.21044,
+      "transformed_training_shape": {
+        "rows": 4000,
+        "columns": 1706,
+        "nonzero_values": 28000,
+        "density": 0.004103165298944901,
+        "sparse": true
+      },
+      "progressive_cap_requested": 4000
+    },
+    {
+      "split": "validation",
+      "rows": 20002,
+      "positive_rows": 3680,
+      "positive_rate": 0.18398160183981602,
+      "roc_auc": 0.7944019108645041,
+      "average_precision": 0.48472347792260323,
+      "accuracy_at_0_5": 0.8341165883411659,
+      "precision_at_0_5": 0.6518456375838926,
+      "recall_at_0_5": 0.21114130434782608,
+      "f1_at_0_5": 0.31896551724137934,
+      "confusion_matrix_at_0_5": [
+        [
+          15907,
+          415
+        ],
+        [
+          2903,
+          777
+        ]
+      ],
+      "inference_seconds": 0.212918,
+      "inference_rows_per_second": 93942.45,
+      "probability_min": 5.05654361404595e-06,
+      "probability_max": 0.9865923523902893,
+      "model": "sgd_logistic_baseline",
+      "training_rows": 23999,
+      "training_positive_rate": 0.1837576565690237,
+      "training_seconds": 0.682967,
+      "transformed_training_shape": {
+        "rows": 23999,
+        "columns": 2935,
+        "nonzero_values": 167993,
+        "density": 0.002385008517887564,
+        "sparse": true
+      },
+      "progressive_cap_requested": 24000
+    },
+    {
+      "split": "validation",
+      "rows": 20002,
+      "positive_rows": 3680,
+      "positive_rate": 0.18398160183981602,
+      "roc_auc": 0.802084218486119,
+      "average_precision": 0.4999370875698221,
+      "accuracy_at_0_5": 0.8356664333566644,
+      "precision_at_0_5": 0.6817761332099908,
+      "recall_at_0_5": 0.20027173913043478,
+      "f1_at_0_5": 0.30959882377651754,
+      "confusion_matrix_at_0_5": [
+        [
+          15978,
+          344
+        ],
+        [
+          2943,
+          737
+        ]
+      ],
+      "inference_seconds": 0.201912,
+      "inference_rows_per_second": 99062.86,
+      "probability_min": 1.3033987670496572e-05,
+      "probability_max": 0.9830830097198486,
+      "model": "sgd_logistic_baseline",
+      "training_rows": 60000,
+      "training_positive_rate": 0.18375,
+      "training_seconds": 1.551666,
+      "transformed_training_shape": {
+        "rows": 60000,
+        "columns": 3528,
+        "nonzero_values": 420000,
+        "density": 0.001984126984126984,
+        "sparse": true
+      },
+      "progressive_cap_requested": 60000
+    }
+  ],
+  "resource_note": "tracemalloc measures Python allocations, not total native/OS memory."
+}

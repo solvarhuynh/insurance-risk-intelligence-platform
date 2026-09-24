@@ -1,0 +1,271 @@
+{
+  "business_roles": {
+    "claim_measure": "claims",
+    "company_fields": [
+      "company_code",
+      "company_name"
+    ],
+    "exposure_measure": null,
+    "geography_field": "state",
+    "premium_measure": "premiums",
+    "product_field": "product",
+    "ratio_measure": "claim_premium_ratio",
+    "time_field": "year_month"
+  },
+  "company_name_consistency": {
+    "company_codes_with_multiple_names": {},
+    "conflict_count": 0
+  },
+  "duplicate_profile": {
+    "candidate_key": [
+      "company_code",
+      "year_month",
+      "product",
+      "state"
+    ],
+    "candidate_key_duplicate_groups": 0,
+    "candidate_key_duplicate_rows": 0,
+    "distinct_exact_rows": 8338214,
+    "exact_duplicate_groups": 0,
+    "exact_duplicate_rows": 0
+  },
+  "field_profiles": {
+    "claim_premium_ratio": {
+      "invalid_count": 0,
+      "max": "19804447419966428",
+      "max_integer_digits": 17,
+      "max_scale_digits": 18,
+      "min": "-6590560657819567",
+      "negative_count": 238088,
+      "null_count": 5167094,
+      "null_sentinels": {
+        "NA": 5167094
+      },
+      "present_count": 3171120,
+      "source_dtype_observed": "decimal text or null sentinel",
+      "suggested_sql_type": "DECIMAL(35,18)",
+      "sum": "21720635954136496.71110000006",
+      "zero_count": 1613406
+    },
+    "claims": {
+      "invalid_count": 0,
+      "max": "5323648483.83",
+      "max_integer_digits": 10,
+      "max_scale_digits": 29,
+      "min": "-4162417826.88",
+      "negative_count": 301382,
+      "null_count": 0,
+      "present_count": 8338214,
+      "source_dtype_observed": "decimal text",
+      "suggested_sql_type": "DECIMAL(38,29)",
+      "sum": "735517715559.6826156273302172",
+      "zero_count": 6547089
+    },
+    "company_code": {
+      "cardinality_excluding_null": 196,
+      "invalid_count": 0,
+      "invalid_values": {},
+      "null_count": 0,
+      "source_dtype_observed": "integer-like text",
+      "suggested_sql_type": "INT"
+    },
+    "company_name": {
+      "cardinality_excluding_null": 196,
+      "max_length": 116,
+      "null_count": 0,
+      "source_dtype_observed": "text",
+      "suggested_sql_type": "NVARCHAR(116)",
+      "top_values": [
+        {
+          "count": 482402,
+          "value": "HDI SEGUROS S.A."
+        },
+        {
+          "count": 460877,
+          "value": "BRASILSEG COMPANHIA DE SEGUROS"
+        },
+        {
+          "count": 422222,
+          "value": "LIBERTY SEGUROS S.A."
+        },
+        {
+          "count": 364525,
+          "value": "MAPFRE SEGUROS GERAIS S.A."
+        },
+        {
+          "count": 338090,
+          "value": "ALIANÇA DO BRASIL SEGUROS S.A"
+        },
+        {
+          "count": 314817,
+          "value": "ZURICH MINAS BRASIL SEGUROS S.A."
+        },
+        {
+          "count": 261279,
+          "value": "HDI GLOBAL SEGUROS S.A"
+        },
+        {
+          "count": 239312,
+          "value": "PORTO SEGURO COMPANHIA DE SEGUROS GERAIS"
+        },
+        {
+          "count": 233750,
+          "value": "AIG SEGUROS BRASIL S.A."
+        },
+        {
+          "count": 233598,
+          "value": "COMPANHIA DE SEGUROS DO ESTADO DE SÃO PAULO - COSESP"
+        }
+      ]
+    },
+    "premiums": {
+      "invalid_count": 0,
+      "max": "2598854052.42",
+      "max_integer_digits": 10,
+      "max_scale_digits": 29,
+      "min": "-224022539.61",
+      "negative_count": 116980,
+      "null_count": 0,
+      "present_count": 8338214,
+      "source_dtype_observed": "decimal text",
+      "suggested_sql_type": "DECIMAL(38,29)",
+      "sum": "3050108693057.190700567726664",
+      "zero_count": 5050114
+    },
+    "product": {
+      "cardinality_excluding_null": 144,
+      "max_length": 42,
+      "null_count": 0,
+      "source_dtype_observed": "text",
+      "suggested_sql_type": "NVARCHAR(42)",
+      "top_values": [
+        {
+          "count": 408279,
+          "value": "0588 - DPVAT"
+        },
+        {
+          "count": 262520,
+          "value": "0993 - Vida em Grupo"
+        },
+        {
+          "count": 245425,
+          "value": "0982 - Acidentes Pessoais"
+        },
+        {
+          "count": 178575,
+          "value": "0977 - Prestamista (exceto Habit e Rural)"
+        },
+        {
+          "count": 174911,
+          "value": "0171 - Riscos Diversos"
+        },
+        {
+          "count": 171451,
+          "value": "0531 - Automóvel - Casco"
+        },
+        {
+          "count": 167486,
+          "value": "0351 - R. C. Geral"
+        },
+        {
+          "count": 166510,
+          "value": "0118 - Compreensivo Empresarial"
+        },
+        {
+          "count": 166418,
+          "value": "0114 - Compreensivo Residencial"
+        },
+        {
+          "count": 166198,
+          "value": "0553 - R. C. Facultativa Veículos - RCFV"
+        }
+      ]
+    },
+    "state": {
+      "cardinality_excluding_null": 40,
+      "max_length": 2,
+      "null_count": 0,
+      "source_dtype_observed": "text",
+      "suggested_sql_type": "NVARCHAR(2)",
+      "top_values": [
+        {
+          "count": 516528,
+          "value": "SP"
+        },
+        {
+          "count": 452805,
+          "value": "RJ"
+        },
+        {
+          "count": 413901,
+          "value": "MG"
+        },
+        {
+          "count": 411511,
+          "value": "PR"
+        },
+        {
+          "count": 407764,
+          "value": "RS"
+        },
+        {
+          "count": 371370,
+          "value": "SC"
+        },
+        {
+          "count": 371284,
+          "value": "BA"
+        },
+        {
+          "count": 363918,
+          "value": "DF"
+        },
+        {
+          "count": 352181,
+          "value": "PE"
+        },
+        {
+          "count": 335385,
+          "value": "GO"
+        }
+      ]
+    },
+    "year_month": {
+      "invalid_count": 0,
+      "invalid_values": {},
+      "max": "2023-07-01",
+      "min": "2003-01-01",
+      "null_count": 0,
+      "source_dtype_observed": "ISO date text",
+      "suggested_sql_type": "DATE"
+    }
+  },
+  "grain_assessment": {
+    "candidate_grain": "Một market observation theo company_code, year_month, product và state.",
+    "candidate_key_is_unique": true,
+    "conclusion": "Mỗi source row là một unique market observation theo company/month/product/state.",
+    "not_supported": "Schema không có CustomerId, PolicyId, VIN, exposure hoặc claim-event identifier."
+  },
+  "row_count": 8338214,
+  "run_metadata": {
+    "batch_size": 25000,
+    "elapsed_seconds": 3466.546,
+    "method": "csv.DictReader streaming; Decimal lexical profile; temporary SQLite duplicate/grain indexes",
+    "profiled_at_utc": "2026-09-23T13:05:04Z",
+    "source_bytes": 751126569,
+    "source_path": "data/raw/susep.gov.br/insurance_dataset.csv"
+  },
+  "schema": {
+    "column_count": 8,
+    "header": [
+      "company_code",
+      "company_name",
+      "year_month",
+      "product",
+      "state",
+      "premiums",
+      "claims",
+      "claim_premium_ratio"
+    ]
+  }
+}

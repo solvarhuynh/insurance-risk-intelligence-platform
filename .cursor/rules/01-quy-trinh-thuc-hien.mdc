@@ -10,16 +10,18 @@ alwaysApply: true
 1. Đọc tối thiểu các tài liệu chuẩn (source of truth):
    - `README.md`
    - `docs/specs/implementation-guide.md`
+   - `docs/architecture/project-scope.md` và `docs/architecture/source-strategy.md` khi task đụng dữ liệu, DWH, ML, orchestration hoặc BI
    - `log/progress-log.md`
    - Tài liệu kiến trúc hoặc hướng dẫn liên quan trực tiếp đến task (trong `docs/architecture/` hoặc `docs/guides/`).
 2. Xác định rõ định nghĩa task:
    - Phase và Subsystem tương ứng.
-   - Task ID (quy ước task mới: `DATA-01`, `DWH-01`, `ETL-01`, `CDC-01`, `DQ-01`, `ML-01`, `AIRFLOW-01`, `TUNE-01`, `BI-01`, `DOCS-01`, `WF-01`).
+   - Task ID (quy ước task mới gồm `P1-SUSEP-*`, `P1-ARCH-*`, `DATA-01`, `DWH-01`, `ETL-01`, `CDC-01`, `DQ-01`, `ML-01`, `AIRFLOW-01`, `TUNE-01`, `BI-01`, `DOCS-01`, `WF-01`).
    - Input dữ liệu / file đầu vào.
    - Output canonical mong đợi.
    - Consumer downstream (thành phần tiêu thụ kết quả phía sau).
    - Kiểm tra cần chạy (validation) và điều kiện dừng (Definition of Done).
-3. Kiểm tra file/thư mục hiện có cùng chức năng trong repo. Ưu tiên sửa trực tiếp file chuẩn; không tự tạo bản song song.
+3. Xác định track dữ liệu trước khi thiết kế: SUSEP là Track A market DWH/performance, brvehins1 là Track B motor risk/ML, Prudential chỉ là planned Track C nếu raw chưa có. Canonical source là track-specific.
+4. Kiểm tra file/thư mục hiện có cùng chức năng trong repo. Ưu tiên sửa trực tiếp file chuẩn; không tự tạo bản song song.
 4. Một task phải thuộc một subsystem rõ ràng trong các khu vực hiện có của Project 1:
    - `DATA`: Quản lý dữ liệu thô, nạp dữ liệu (`data/raw/`, `notebooks/`)
    - `DWH`: Thiết kế mô hình Star Schema, bảng chiều, bảng sự kiện (`migrations/`)
@@ -40,6 +42,7 @@ alwaysApply: true
 ## Trong khi làm
 
 - Không bịa dữ liệu, insight, metric, đường dẫn, kết quả chạy hoặc khả năng tích hợp.
+- Không fake join giữa tracks, không tự tạo CustomerId/PolicyId/mapping chỉ vì các source cùng thuộc bảo hiểm. Same business domain không chứng minh same row identity.
 - Không dùng dữ liệu kiểm thử/test để chọn feature, threshold hay model.
 - Giữ nguyên cấu trúc thư mục hiện có của Project 1 (`sql/`, `migrations/`, `dags/`, `ml/`, `notebooks/`, `powerbi/`). Không tự ý thay đổi cấu trúc thư mục dự án.
 - Không sửa file ngoài scope task. Nếu phát hiện lỗi khác, ghi vào `log/progress-log.md` như một next step.

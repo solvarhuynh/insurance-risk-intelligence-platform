@@ -1,10 +1,10 @@
-# Từ điển dữ liệu nguồn chuẩn — brvehins1
+# Từ điển dữ liệu nguồn Track B — brvehins1
 
 Trạng thái: `DONE` cho source data contract `P1-DATA-02`. Bằng chứng profile nằm tại `reports/data/brvehins1-profile.json`, `reports/data/brvehins1-column-profile.csv` và `reports/data/brvehins1-eda-summary.md`.
 
 ## Phạm vi
 
-Contract này áp dụng duy nhất cho năm partition `data/raw/brvehins1/brvehins1[a-e].csv`, gồm 1,965,355 dòng và 23 cột. `data/raw/susep.gov.br/insurance_dataset.csv` là **LEGACY / NON-CANONICAL**, nằm ngoài dictionary và pipeline này.
+Contract này áp dụng duy nhất cho Track B: năm partition `data/raw/brvehins1/brvehins1[a-e].csv`, gồm 1,965,355 dòng và 23 cột. SUSEP là Track A độc lập; nó nằm ngoài dictionary và pipeline Track B này, không phải source thay thế hay join target.
 
 Kiểu physical dưới đây là dtype quan sát qua pandas streaming. Kiểu SQL là mapping chuẩn để staging và DWH giữ được giá trị nguồn; chúng không làm phát sinh business identifier.
 

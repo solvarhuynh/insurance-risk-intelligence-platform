@@ -1,11 +1,9 @@
-# Insight nghiệp vụ — chờ dữ liệu DWH
+# Insight nghiệp vụ được tổ chức theo track thế nào?
 
-Trạng thái: `SCAFFOLD`.
+Trạng thái: chưa có report insight business đã được phê duyệt.
 
-Insight chỉ được viết sau khi DWH có dữ liệu đã đối soát và Data Quality gate đã pass. Các phân tích dự kiến phải dựa trên số liệu thực tế, gồm:
+Track B đã có DWH/DQ runtime evidence, nhưng report này không tự suy ra insight chỉ vì table tồn tại. Nếu tạo risk analytics, phải ghi rõ aggregate-risk grain và không diễn giải thành customer/policy behavior.
 
-1. Exposure, premium và claim theo bang, khu vực, nhóm xe và nhóm tuổi người lái.
-2. Claim frequency theo exposure dương và loss ratio theo premium dương.
-3. Các quan sát chất lượng dữ liệu hoặc bất thường có bằng chứng, không gán nhãn outlier là lỗi khi chưa có contract.
+Track A sẽ là nơi tạo market analytics sau P1-SUSEP-01 đến P1-SUSEP-05: premium/claims theo company, month, product và state chỉ được báo cáo khi contract xác nhận grain, units và ratio semantics.
 
-Không có insight, threshold nghiệp vụ hoặc kết quả ML nào được xem là đã chứng minh trước khi các stage dữ liệu nền tảng hoàn tất.
+Không join SUSEP với brvehins1 để tạo insight. Nếu một báo cáo đặt hai track cạnh nhau, nguồn, metric, time range và non-comparability phải được ghi rõ.

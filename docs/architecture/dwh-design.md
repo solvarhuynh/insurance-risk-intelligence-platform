@@ -1,10 +1,10 @@
-# Thiết kế DWH canonical — brvehins1
+# Thiết kế DWH Track B — brvehins1 Motor Risk
 
 Trạng thái: `RUNTIME_PASS` cho P1-DWH-01/P1-DWH-02/P1-DWH-03. Ba dimension và fact canonical đã có DDL, load, reconciliation và rerun runtime.
 
 ## Phạm vi và nguyên tắc
 
-Thiết kế này chỉ dùng `brvehins1` đã được ingest vào `stg.BrVehIns1` (1,965,355 rows). Nó không đọc, join hoặc dùng `data/raw/susep.gov.br/insurance_dataset.csv`, vì file đó là legacy/non-canonical.
+Thiết kế này chỉ dùng Track B `brvehins1` đã được ingest vào `stg.BrVehIns1` (1,965,355 rows). Nó không đọc, join hoặc dùng SUSEP trong model này vì SUSEP là Track A độc lập, không phải vì SUSEP không còn là canonical source.
 
 Nguồn không có business customer identifier, policy identifier, thời điểm hiệu lực hay claim event identifier. Do đó không tạo `CustomerId`, `PolicyNumber`, `Dim_Customer`, `Dim_Policy`, SCD2, time dimension, hay fact claim-event. Những tên file scaffold cũ không là bằng chứng để tạo business entity.
 

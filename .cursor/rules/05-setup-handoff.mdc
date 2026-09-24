@@ -22,6 +22,8 @@ Khi một task tạo mới hoặc thay đổi bất kỳ thành phần thực th
 
 Nếu cách chạy, tham số, lệnh thực thi, file input hoặc file output có sự thay đổi, bắt buộc phải cập nhật đồng bộ vào `docs/guides/how-to-run.md` trong cùng task đó.
 
+Khi task thay đổi source strategy hoặc thêm track, phải cập nhật thêm `docs/architecture/project-scope.md`, `docs/architecture/source-strategy.md` và roadmap. Không ghi một source là canonical duy nhất nếu canonical status chỉ đúng trong một track.
+
 ## Tính trung thực về trạng thái thực thi
 
 - Chỉ ghi nhận vào hướng dẫn các câu lệnh thực tế đã tồn tại trong repository và đã được kiểm tra tính hợp lệ.

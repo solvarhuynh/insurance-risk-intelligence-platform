@@ -1,4 +1,4 @@
--- V1: Idempotent bootstrap for the canonical brvehins1 foundation.
+-- V1: Idempotent bootstrap for the Track B brvehins1 foundation.
 -- This migration creates only database-level metadata and audit objects.
 -- Business staging, dimensions, facts and DQ rules are added by later versions.
 
@@ -127,6 +127,6 @@ IF NOT EXISTS (
 )
 BEGIN
     INSERT INTO meta.SchemaVersion (MigrationVersion, Description)
-    VALUES (N'V1', N'Canonical brvehins1 foundation bootstrap');
+    VALUES (N'V1', N'Track B brvehins1 foundation bootstrap');
 END;
 GO

@@ -6,6 +6,9 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
+      # Required for the isolated P1-INC-02 CDC engineering demonstration.
+      # CDC remains disabled until the versioned demo migration is applied.
+      MSSQL_AGENT_ENABLED: "true"
       MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?Set SQLSERVER_SA_PASSWORD in the ignored .env file or process environment.}
     ports:
       - "1433:1433"
@@ -15,7 +18,9 @@ services:
 
   airflow:
     profiles: ["orchestration"]
-    image: apache/airflow:2.8.1-python3.10
+    build:
+      context: .
+      dockerfile: airflow/Dockerfile
     container_name: insurance_airflow
     restart: unless-stopped
     depends_on:
@@ -25,6 +30,8 @@ services:
       AIRFLOW__CORE__EXECUTOR: SequentialExecutor
       AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
       AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-configure-before-orchestration-runtime}
+      SQLSERVER_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?Set SQLSERVER_SA_PASSWORD in the ignored .env file or process environment.}
+      SQLSERVER_HOST: sqlserver,1433
     ports:
       - "8080:8080"
     volumes:
@@ -32,6 +39,9 @@ services:
       - ./sql:/opt/airflow/sql
       - ./log:/opt/airflow/logs
       - ./data/raw:/opt/airflow/raw_data:ro
+      - ./scripts:/opt/airflow/project/scripts:ro
+      - ./ml:/opt/airflow/project/ml:ro
+      - ./reports:/opt/airflow/project/reports
     command: standalone
 
 volumes:

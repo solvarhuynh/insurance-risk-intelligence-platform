@@ -1,0 +1,7 @@
+# Airflow 2.8's bundled provider stack includes binary extensions built for NumPy 1.x.
+numpy==1.26.4
+pandas==2.2.3
+pyodbc==5.3.0
+# Must match the declared repository venv so the Track-B joblib artifact reloads.
+scikit-learn==1.7.2
+joblib==1.5.2

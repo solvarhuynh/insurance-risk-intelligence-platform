@@ -1,174 +1,142 @@
-"""
-insurance_dwh_pipeline.py
-Giai doan: Giai doan 6 — Orchestration voi Airflow
-Muc dich: Dieu phoi toan bo pipeline Data Warehouse & Machine Learning:
-          Load Staging -> Load Dim (song song) -> Load Fact -> Data Quality Check
-          -> Batch Risk Prediction (ML) -> Load Risk Predictions -> Notify
-Tham chieu: docs/specs/implementation-guide.md
+"""Airflow orchestration for independent Track A and Track B platform flows."""
 
-Thu tu phu thuoc (Dependency):
-  load_staging >> [load_dim_customer, load_dim_policy, load_dim_date, load_dim_region]
-  [load_dim_customer, load_dim_policy, load_dim_date, load_dim_region] >> [load_fact_premium, load_fact_claims]
-  [load_fact_premium, load_fact_claims] >> run_data_quality_checks >> predict_customer_risk >> load_risk_predictions >> notify
-"""
+from __future__ import annotations
 
+import os
+import subprocess
+import sys
 from datetime import datetime, timedelta
+from pathlib import Path
+
+import pyodbc
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 
 
-def failure_alert(context):
-    """
-    on_failure_callback: Canh bao khi co bat ky task nao that bai trong DAG.
-    """
-    task_instance = context.get('task_instance')
-    dag_id = context.get('dag').dag_id
-    execution_date = context.get('execution_date')
-    log_url = task_instance.log_url
-    print(f"[ALERT] Task failed in DAG: {dag_id}")
-    print(f"Task ID: {task_instance.task_id}")
-    print(f"Execution Date: {execution_date}")
-    print(f"Log URL: {log_url}")
-    # TODO: Gui thong bao qua Webhook Slack/Teams hoac email alert neu co SMTP
+PROJECT = Path("/opt/airflow/project")
+RAW_SUSEP = Path("/opt/airflow/raw_data/susep.gov.br/insurance_dataset.csv")
+SUSEP_LOADER = PROJECT / "scripts" / "load_susep_to_staging.py"
+SUSEP_RECONCILER = PROJECT / "scripts" / "reconcile_susep_source_to_fact.py"
+RISK_SCORER = PROJECT / "ml" / "predict_risk_batch.py"
+RISK_POPULATION = "bounded_held_out_test"
 
 
-def run_stored_procedure_stub(procedure_name: str, **kwargs):
-    """
-    TODO: Thuc thi Stored Procedure tren SQL Server qua MsSqlHook / pyodbc.
-    Vi du:
-        hook = MsSqlHook(mssql_conn_id='mssql_default')
-        hook.run(f"EXEC {procedure_name} @BatchId = '{kwargs.get('run_id')}';")
-    """
-    print(f"Executing Stored Procedure stub: {procedure_name}")
-    print(f"Run ID: {kwargs.get('run_id')}")
+def connect() -> pyodbc.Connection:
+    password = os.environ["SQLSERVER_SA_PASSWORD"]
+    return pyodbc.connect(
+        "DRIVER={ODBC Driver 18 for SQL Server};SERVER=sqlserver,1433;"
+        "DATABASE=DWH_Insurance;UID=sa;PWD=" + password + ";Encrypt=no;TrustServerCertificate=yes;"
+    )
 
 
-def run_ml_batch_prediction_stub(**kwargs):
-    """
-    TODO: Thuc thi script ML batch scoring (ml/predict_risk_batch.py).
-    Doc cac record khach hang moi, tinh toan PredictedClaimProbability va RiskCategory.
-    """
-    print("Executing ML Batch Risk Scoring job...")
-    print(f"Batch Run ID: {kwargs.get('run_id')}")
+def run_python(path: Path, *arguments: str) -> None:
+    result = subprocess.run(
+        [sys.executable, str(path), *arguments], cwd=str(PROJECT), check=False, text=True, capture_output=True
+    )
+    if result.returncode:
+        raise RuntimeError(
+            f"Python task failed ({path.name}, exit={result.returncode}): "
+            f"stdout={result.stdout[-2000:]}; stderr={result.stderr[-2000:]}"
+        )
+    print(result.stdout)
 
 
-default_args = {
-    'owner': 'data_engineering_team',
-    'depends_on_past': False,
-    'start_date': datetime(2026, 1, 1),
-    'retries': 3,
-    'retry_delay': timedelta(minutes=5),
-    'on_failure_callback': failure_alert,
-}
+def track_a_ingest(**_) -> None:
+    """Idempotent source-version load; current canonical file becomes SKIPPED on rerun."""
+    run_python(SUSEP_LOADER, "--source-path", str(RAW_SUSEP), "--server", "sqlserver,1433")
+
+
+def track_a_load_dwh(**_) -> None:
+    with connect() as connection:
+        cursor = connection.cursor()
+        cursor.execute("EXEC dwh.sp_LoadSusepDimensions;")
+        cursor.execute("EXEC dwh.sp_LoadFactSusepInsuranceMarket;")
+        connection.commit()
+
+
+def track_a_reconcile(**_) -> None:
+    """Direct full-file reconciliation is intentionally a real, not synthetic, control."""
+    run_python(SUSEP_RECONCILER, "--source-path", str(RAW_SUSEP), "--server", "sqlserver,1433")
+
+
+def track_a_quality_gate(**context) -> None:
+    inject = bool((context["dag_run"].conf or {}).get("controlled_track_a_dq_failure", False))
+    with connect() as connection:
+        # SQL Server can return the procedure's result set before it exposes a
+        # terminal THROW to pyodbc.  Consume every result set so an executable
+        # DQ failure becomes an Airflow task failure instead of a false success.
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute("EXEC dq.sp_RunSusepQualityGate @RunLabel=?, @InjectControlledFailure=?;", "airflow", int(inject))
+        while cursor.nextset():
+            pass
+
+
+def track_b_foundation_precheck(**_) -> None:
+    with connect() as connection:
+        row = connection.execute("SELECT (SELECT COUNT_BIG(*) FROM stg.BrVehIns1), (SELECT COUNT_BIG(*) FROM dwh.FactRiskObservation)").fetchone()
+    if row[0] != row[1] or row[0] == 0:
+        raise RuntimeError(f"Track B foundation reconciliation failed: staging={row[0]}, fact={row[1]}")
+    print(f"Track B foundation PASS: staging={row[0]}, fact={row[1]}")
+
+
+def track_b_incremental_audit(**_) -> None:
+    with connect() as connection:
+        rows = connection.execute("SELECT COUNT(*) FROM meta.IngestionBatch WHERE Status=N'SUCCESS'").fetchone()[0]
+    if rows < 5:
+        raise RuntimeError(f"Expected five successful canonical Track-B batches, found {rows}")
+    print(f"Track B incremental audit PASS: successful batches={rows}")
+
+
+def track_b_quality_gate(**context) -> None:
+    inject = bool((context["dag_run"].conf or {}).get("controlled_track_b_dq_failure", False))
+    with connect() as connection:
+        # See Track A: drain procedure result sets so SQL THROW propagates to
+        # Airflow and blocks the dependent scoring task.
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute("EXEC dq.sp_RunQualityGate @RunLabel=?, @InjectControlledFailure=?;", "airflow", int(inject))
+        while cursor.nextset():
+            pass
+
+
+def track_b_batch_score(**context) -> None:
+    run_python(RISK_SCORER, "--run-id", str(context["run_id"]))
+
+
+def track_b_validate_predictions(**_) -> None:
+    with connect() as connection:
+        row = connection.execute(
+            "SELECT COUNT_BIG(*),COUNT(DISTINCT SourceFile+N':'+CONVERT(nvarchar(20),SourceRowNumber)) FROM dwh.RiskObservationPrediction WHERE ScoringPopulation=?;",
+            RISK_POPULATION,
+        ).fetchone()
+    if row[0] != row[1] or row[0] == 0:
+        raise RuntimeError(f"Track B prediction reconciliation failed: rows={row[0]}, distinct_identity={row[1]}")
+    print(f"Track B prediction reconciliation PASS: rows={row[0]}")
+
 
 with DAG(
-    dag_id='insurance_dwh_pipeline',
-    default_args=default_args,
-    description='Pipeline ETL, Data Quality va Batch ML Scoring DWH Bao hiem (SQL Server + CDC + LightGBM)',
-    schedule_interval='@daily',
-    catchup=False,
-    tags=['insurance', 'dwh', 'cdc', 'sqlserver', 'machine-learning'],
+    dag_id="insurance_data_platform",
+    description="Independent SUSEP market and brvehins1 risk/ML flows; no cross-track data join",
+    start_date=datetime(2026, 1, 1), schedule=None, catchup=False,
+    default_args={"owner": "data_engineering_team", "retries": 1, "retry_delay": timedelta(minutes=1)},
+    tags=["insurance-platform", "track-a-susep", "track-b-brvehins1", "dq", "ml"],
 ) as dag:
+    start = EmptyOperator(task_id="platform_start")
+    end_a = EmptyOperator(task_id="track_a_market_consumer_ready")
+    end_b = EmptyOperator(task_id="track_b_risk_consumer_ready")
 
-    # -------------------------------------------------------------------------
-    # Task: load_staging
-    # -------------------------------------------------------------------------
-    # TODO: Goi script/procedure BULK INSERT nap du lieu tho vao Staging_InsuranceRaw
-    load_staging = PythonOperator(
-        task_id='load_staging',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_Staging'},
-    )
+    a_ingest = PythonOperator(task_id="track_a_ingest_susep", python_callable=track_a_ingest)
+    a_dwh = PythonOperator(task_id="track_a_load_market_dwh", python_callable=track_a_load_dwh)
+    a_reconcile = PythonOperator(task_id="track_a_reconcile_raw_to_fact", python_callable=track_a_reconcile)
+    a_dq = PythonOperator(task_id="track_a_data_quality_gate", python_callable=track_a_quality_gate)
 
-    # -------------------------------------------------------------------------
-    # Dimension Tasks (Chay song song sau load_staging)
-    # -------------------------------------------------------------------------
-    # TODO: Goi Stored Procedure sp_Load_DimCustomer (SCD Type 2 tu Porto Seguro)
-    load_dim_customer = PythonOperator(
-        task_id='load_dim_customer',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_DimCustomer'},
-    )
+    b_precheck = PythonOperator(task_id="track_b_foundation_precheck", python_callable=track_b_foundation_precheck)
+    b_incremental = PythonOperator(task_id="track_b_incremental_audit", python_callable=track_b_incremental_audit)
+    b_dq = PythonOperator(task_id="track_b_data_quality_gate", python_callable=track_b_quality_gate)
+    b_score = PythonOperator(task_id="track_b_batch_score_held_out", python_callable=track_b_batch_score)
+    b_validate = PythonOperator(task_id="track_b_validate_prediction_reconciliation", python_callable=track_b_validate_predictions)
 
-    # TODO: Goi Stored Procedure sp_Load_DimPolicy
-    load_dim_policy = PythonOperator(
-        task_id='load_dim_policy',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_DimPolicy'},
-    )
-
-    # TODO: Goi Stored Procedure sp_Load_DimDate
-    load_dim_date = PythonOperator(
-        task_id='load_dim_date',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_DimDate'},
-    )
-
-    # TODO: Goi Stored Procedure sp_Load_DimRegion
-    load_dim_region = PythonOperator(
-        task_id='load_dim_region',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_DimRegion'},
-    )
-
-    # -------------------------------------------------------------------------
-    # Fact Tasks (Phu thuoc tat ca cac Dimension)
-    # -------------------------------------------------------------------------
-    # TODO: Goi Stored Procedure sp_Load_FactPremium
-    load_fact_premium = PythonOperator(
-        task_id='load_fact_premium',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_FactPremium'},
-    )
-
-    # TODO: Goi Stored Procedure sp_Load_FactClaims
-    load_fact_claims = PythonOperator(
-        task_id='load_fact_claims',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_FactClaims'},
-    )
-
-    # -------------------------------------------------------------------------
-    # Task: run_data_quality_checks (Phu thuoc Fact tables)
-    # -------------------------------------------------------------------------
-    # TODO: Goi Stored Procedure sp_Run_DataQualityChecks
-    run_data_quality_checks = PythonOperator(
-        task_id='run_data_quality_checks',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Run_DataQualityChecks'},
-    )
-
-    # -------------------------------------------------------------------------
-    # Machine Learning Batch Prediction Tasks
-    # -------------------------------------------------------------------------
-    # Task 1: Chay batch scoring bang Python ML Model
-    predict_customer_risk = PythonOperator(
-        task_id='predict_customer_risk',
-        python_callable=run_ml_batch_prediction_stub,
-    )
-
-    # Task 2: Nap ket qua du doan ML vao Fact_Customer_Risk_Prediction trong DWH
-    load_risk_predictions = PythonOperator(
-        task_id='load_risk_predictions',
-        python_callable=run_stored_procedure_stub,
-        op_kwargs={'procedure_name': 'dbo.sp_Load_CustomerRiskPredictions'},
-    )
-
-    # -------------------------------------------------------------------------
-    # Task: notify (Gui thong bao sau khi pipeline hoan thanh thanh cong)
-    # -------------------------------------------------------------------------
-    # TODO: Thong bao hoan thanh pipeline qua webhook hoac log
-    notify = EmptyOperator(
-        task_id='notify',
-    )
-
-    # -------------------------------------------------------------------------
-    # Pipeline Dependencies
-    # -------------------------------------------------------------------------
-    dim_tasks = [load_dim_customer, load_dim_policy, load_dim_date, load_dim_region]
-    fact_tasks = [load_fact_premium, load_fact_claims]
-
-    load_staging >> dim_tasks
-    dim_tasks >> fact_tasks
-    fact_tasks >> run_data_quality_checks >> predict_customer_risk >> load_risk_predictions >> notify
+    start >> a_ingest >> a_dwh >> a_reconcile >> a_dq >> end_a
+    start >> b_precheck >> b_incremental >> b_dq >> b_score >> b_validate >> end_b

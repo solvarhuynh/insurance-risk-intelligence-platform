@@ -2,6 +2,10 @@
 .env
 .env.*
 !.env.example
+# Private working notes (kept on this machine only)
+/GUIDE.md
+/CHANGELOG.md
+/AGENTS.md
 .venv/
 venv/
 __pycache__/

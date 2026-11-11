@@ -1,5 +1,5 @@
 -- Repeat the real Track-A workloads without dropping indexes or clearing cache.
--- Historical before/after evidence: CHANGELOG.md; retained indexes: migration V14.
+-- Historical before/after evidence: data/evidence.json; retained indexes: migration V14.
 USE DWH_Insurance;
 GO
 SET STATISTICS IO ON;

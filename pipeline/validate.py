@@ -12,7 +12,7 @@ from config import ROOT
 
 
 def validate(raw: bool = False) -> None:
-    required = ["README.md", "GUIDE.md", "CHANGELOG.md", "AGENTS.md", ".env.example", "docker-compose.yml",
+    required = ["README.md", ".env.example", "docker-compose.yml",
                 "dashboard/app.py", "dashboard/assets/style.css", "pipeline/manage.py", "data/dashboard.json", "data/evidence.json"]
     for name in required:
         if not (ROOT / name).is_file():
@@ -24,8 +24,12 @@ def validate(raw: bool = False) -> None:
     if versions != list(range(1, 15)):
         raise ValueError(f"Migration sequence: {versions}")
     for document in ("README.md", "GUIDE.md", "CHANGELOG.md", "AGENTS.md"):
+        if not (ROOT / document).is_file():
+            continue  # Local learning notes are deliberately absent from public clones.
         content = (ROOT / document).read_text(encoding="utf-8")
-        for target in re.findall(r"\]\(([^)]+)\)", content):
+        targets = re.findall(r"\]\(([^)]+)\)", content)
+        targets += re.findall(r"(?:href|src)=\"([^\"]+)\"", content)
+        for target in targets:
             if "://" not in target and not target.startswith("#"):
                 path = target.split("#")[0]
                 if path and not (ROOT / path).exists():

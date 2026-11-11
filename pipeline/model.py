@@ -42,7 +42,7 @@ MODEL_FEATURES = [
     "Gender", "DrivAge", "VehYear", "VehModel", "VehGroup", "Area", "StateAb"
 ]
 IDENTITY_COLUMNS = ["SourceFile", "SourceRowNumber", "SourceRecordHash"]
-DATA_CONTRACT_REFERENCE = "GUIDE.md"
+DATA_CONTRACT_REFERENCE = "README.md#data-contract"
 
 # 100k is intentionally below both the prior all-DWH materialisation and the
 # 300k bounded attempt, which reached about 0.92 GB working set before the

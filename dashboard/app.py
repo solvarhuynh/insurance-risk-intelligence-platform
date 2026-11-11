@@ -11,9 +11,10 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, dcc, html, no_update
 
-from dashboard.data import market_frames, risk_frames, snapshot, table
+from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
 
-TEAL, ORANGE, INK, MUTED = "#087f8c", "#db8856", "#172b3a", "#718096"
+BLUE, TEAL, ORANGE, INK, MUTED = "#003366", "#007c83", "#d17b52", "#13334b", "#61768a"
+PALE_BLUE, GRID = "#9db9cb", "#e5edf2"
 STATES = {
     "AC": "Acre", "AL": "Alagoas", "AM": "Amazonas", "AP": "Amapá", "BA": "Bahia",
     "CE": "Ceará", "DF": "Federal District", "ES": "Espírito Santo", "GO": "Goiás",
@@ -30,6 +31,14 @@ PRODUCTS = {
     "0531": "Motor own damage", "0553": "Motor liability", "0588": "DPVAT motor cover",
     "0775": "Public-sector surety", "0776": "Private-sector surety", "0977": "Credit life",
     "0982": "Personal accident", "0991": "Individual life", "0992": "Individual VGBL plans",
+    "0993": "Group life", "0994": "VGBL plans", "1391": "Life insurance", "1392": "VGBL & related plans",
+}
+PRODUCT_SHORT = {
+    "0118": "Business cover", "0141": "Business interruption", "0167": "Engineering",
+    "0171": "Other risks", "0195": "Extended warranty", "0196": "Operational risks",
+    "0531": "Motor own damage", "0553": "Motor liability", "0588": "DPVAT motor",
+    "0775": "Public surety", "0776": "Private surety", "0977": "Credit life",
+    "0982": "Personal accident", "0991": "Individual life", "0992": "Individual VGBL",
     "0993": "Group life", "0994": "VGBL plans", "1391": "Life insurance", "1392": "VGBL & related plans",
 }
 ICONS = {
@@ -76,24 +85,39 @@ def ratio(numerator, denominator):
     return numerator / denominator if denominator > 0 else None
 
 
-def metric(label, value, detail, *, symbol="rows", tone="neutral", exact=None):
+def metric(label, value, detail, *, symbol="rows", tone="neutral", exact=None, comparison=None):
     display = [value[:-3], html.Span("MB", className="metric-unit")] if value.endswith(" MB") else value
     return html.Div([
         html.Div([html.Span(label, className="metric-label"), icon(symbol)], className="metric-top"),
-        html.Strong(display, title=str(exact) if exact is not None else value), html.Small(detail),
+        html.Strong(display, title=str(exact) if exact is not None else value), html.Small(detail), comparison,
     ], className=f"metric {tone}")
+
+
+def market_change(comparison, key, *, lower_is_better=False):
+    if not comparison:
+        return None
+    change = comparison[key]
+    rounded = round(change, 1)
+    favorable = change < 0 if lower_is_better else change > 0
+    tone = "neutral" if rounded == 0 else "positive" if favorable else "negative"
+    unit = " pp" if lower_is_better else "%"
+    meaning = "Claims / premiums movement; lower is favorable" if lower_is_better else "Premium volume movement; higher means growth"
+    return html.Div([
+        html.Span(f"{rounded:+.1f}{unit} · latest year", className=f"metric-change {tone}"),
+        html.Span(comparison["period"], className="comparison-period"),
+    ], className="metric-comparison", title=f"{meaning}. Same calendar months: {comparison['period']}. Totals above cover the selected range.")
 
 
 def figure(key, x, y):
     chart = go.Figure()
     chart.update_layout(
         template="plotly_white", title=None, autosize=True,
-        margin=dict(l=12, r=24, t=24, b=12),
+        margin=dict(l=12, r=28, t=24, b=20),
         font=dict(family="Inter, Segoe UI, sans-serif", color=MUTED, size=12),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
         xaxis=dict(title=dict(text=x, standoff=16), showgrid=False, zeroline=False, automargin=True,
                    tickfont=dict(size=11)),
-        yaxis=dict(title=dict(text=y, standoff=12), gridcolor="#eaf0f3", zeroline=False,
+        yaxis=dict(title=dict(text=y, standoff=12), gridcolor=GRID, zeroline=False,
                    automargin=True, tickfont=dict(size=11), nticks=5),
         legend=dict(orientation="h", y=1.16, x=0, title=None, font=dict(size=11)),
         hovermode="x unified", hoverlabel=dict(bgcolor="white", font_size=12, font_color=INK),
@@ -147,11 +171,6 @@ def export_button(track):
                      dcc.Download(id=f"{track}-download")], className="export-action")
 
 
-def reading_note(title, text):
-    return html.Details([html.Summary([icon("info"), title, html.Span("+", className="details-toggle")]), html.P(text)],
-                        className="reading-note")
-
-
 def market_page():
     monthly = table("market", "monthly")
     years = sorted(monthly["month"].str[:4].astype(int).unique())
@@ -178,20 +197,15 @@ def market_page():
                        "market-trend", wide=True, headline_id="market-takeaway",
                        controls=dcc.RadioItems(id="market-grain", options=[{"label": "Monthly", "value": "monthly"},
                                               {"label": "Annual", "value": "annual"}], value="monthly", className="segmented"),
-                       footer=[html.Span(className="legend-dot teal"), "Premiums", html.Span(className="legend-dot orange"), "Claims",
+                       footer=[html.Span(className="legend-dot premium"), "Premiums", html.Span(className="legend-dot orange"), "Claims",
                                html.Span("2023 includes January–July only", className="chart-caveat")]),
             chart_card("Which companies lead premium volume?",
-                       "Top 10 insurers within your selection. Hover for the full source company name.",
-                       "market-companies", footer="Premiums · billions of source units"),
+                       "Top 10 insurers · premiums in billions of source units. Full names on hover.",
+                       "market-companies"),
             chart_card("Where is premium volume concentrated?",
-                       "Top 8 product lines within your selection. Labels include official SUSEP line codes.",
-                       "market-products", footer="Premiums · billions of source units"),
+                       "Top 8 product lines · premiums in billions of source units. Source codes on hover.",
+                       "market-products"),
         ], className="chart-grid"),
-        reading_note("How to read these market figures",
-                     "Claims / premiums is the ratio of the two totals, shown only when premiums are positive. "
-                     "Monetary units have not been independently confirmed; values remain in source units. "
-                     "Negative adjustments are retained. The 2023 total covers January–July and is not a full-year comparison. "
-                     "The CSV contains the filtered monthly/state aggregates."),
     ]
 
 
@@ -199,7 +213,7 @@ def risk_page():
     metrics = snapshot()["model_metrics"]
     return [
         page_header("MOTOR ANALYTICS / TRACK B", "Motor risk & model insights",
-                    "Explore observed claim patterns and model scores in an independent motor insurance dataset.",
+                    "Observed claim patterns and cross-sectional model scores, across two distinct analysis populations.",
                     "MODEL EVALUATION", f"{metrics['rows']:,} held-out observations", "Historical evaluation · September 2026"),
         html.Div([
             state_filter("risk", sorted(table("risk", "segments")["state"].unique())),
@@ -212,21 +226,12 @@ def risk_page():
         ], className="filter-bar risk-filter"),
         html.Div(id="risk-metrics", className="metrics", **{"aria-live": "polite"}),
         html.Div([
-            chart_card("Where model scores are concentrated", "Filtered held-out observations, grouped into 0.05-wide model score bands.",
+            chart_card("Where model scores are concentrated", "Held-out association scores in 0.05-wide bands; not validated future claim probabilities.",
                        "risk-distribution", headline_id="risk-takeaway"),
             chart_card("How scores relate to observed claims", "Observed HasClaim share and mean model score within each held-out score band.", "risk-observed"),
             chart_card("Observed claim share varies by age group", "Share of observations with HasClaim, across the full filtered risk warehouse.", "risk-age"),
             chart_card("The observation mix behind the analysis", "Counts by source Gender label, including corporate and unknown records.", "risk-gender"),
         ], className="chart-grid"),
-        html.Div([icon("shield"), html.Div([html.Strong("Model scope"),
-                  html.P("Scores describe cross-sectional association with HasClaim. They are not validated probabilities of future claims. "
-                         "The risk warehouse and held-out scoring sample are separate populations.")])], className="scope-note"),
-        reading_note("Population, exposure and model interpretation",
-                     "The geography filter applies separately to warehouse aggregates and the existing held-out predictions. "
-                     "Claim frequency is total claim count divided by total exposure in source units. "
-                     "ROC-AUC and average precision are fixed historical results for the full held-out set. "
-                     "The score comparison is descriptive and does not establish calibration or causality. "
-                     "Unknown labels remain visible. The CSV contains state/profile/age aggregates, not individual predictions."),
     ]
 
 
@@ -255,22 +260,22 @@ def platform_page():
     matched = sum(counts[f"{p}_staging"] == counts[f"{p}_fact"] for p in ("market", "risk"))
     reductions = 100 * (1 - perf["after_reads"] / perf["before_reads"])
     chart = figure("SQL logical reads", "Logical reads · log scale", "")
-    for col, name, color in [("before_reads", "Before index", "#c7d2dc"), ("after_reads", "After index", TEAL)]:
+    for col, name, color in [("before_reads", "Before index", PALE_BLUE), ("after_reads", "After index", TEAL)]:
         chart.add_bar(y=perf["workload"], x=perf[col], name=name, orientation="h", marker_color=color,
                       text=[f"{v:,}" for v in perf[col]], textposition="outside", cliponaxis=False,
                       hovertemplate="%{y}<br>%{fullData.name}: %{x:,} logical reads<extra></extra>")
     chart.update_layout(barmode="group", bargap=.48, margin=dict(l=12, r=64, t=50, b=16))
     chart.update_xaxes(type="log", range=[2, 6.1], tickvals=[100, 1000, 10000, 100000, 1000000], ticktext=["100", "1K", "10K", "100K", "1M"])
-    chart.update_yaxes(autorange="reversed", showgrid=False)
+    chart.update_yaxes(autorange="reversed", showgrid=False, ticklabelstandoff=12)
     return [
         page_header("PLATFORM ASSURANCE / ENGINEERING", "Quality you can trace",
                     "Reconcile warehouse counts and see the measured trade-offs behind faster SQL queries.",
                     "EVIDENCE WINDOW", "Snapshot + historical benchmark", "SQL benchmark measured 24 Sep 2026"),
         html.Div([
-            metric("Warehouse observations", number(counts["market_fact"] + counts["risk_fact"]), "Across two independent data tracks", symbol="database", tone="teal"),
-            metric("Row-count reconciliation", f"{matched} / 2", "Staging and fact counts in this snapshot", symbol="check"),
-            metric("Q1 logical reads saved", f"{reductions.iloc[0]:.2f}%", "Historical company / month workload", symbol="risk", tone="teal"),
-            metric("Additional index storage", f"{perf['index_mb'].sum():,.2f} MB", "Two covering indexes · added write cost", symbol="database"),
+            metric("Warehouse observations", number(counts["market_fact"] + counts["risk_fact"]), "Across two independent data tracks", symbol="database"),
+            metric("Row-count reconciliation", f"{matched} / 2", "Staging and fact counts in this snapshot", symbol="check", tone="positive" if matched == 2 else "negative"),
+            metric("Q1 logical reads saved", f"{reductions.iloc[0]:.2f}%", "Historical company / month workload", symbol="risk", tone="positive" if reductions.iloc[0] > 0 else "negative"),
+            metric("Additional index storage", f"{perf['index_mb'].sum():,.2f} MB", "Two covering indexes · added write cost", symbol="database", tone="cost"),
         ], className="metrics"),
         html.Section([
             html.Div([html.Div([html.H2("Fewer reads, with an explicit storage cost"),
@@ -291,11 +296,6 @@ def platform_page():
             reconciliation_table(counts),
             html.Div("Matching row counts are one check. Full data-quality gate logs remain in SQL Server; this view does not rerun those gates.", className="chart-footnote"),
         ], className="chart-card quality-panel"),
-        reading_note("How the two tracks fit together",
-                     "Airflow orchestrates the market and motor-risk pipelines independently. "
-                     "There is no proven customer, policy or row-level join between the sources. "
-                     "This dashboard reads a dated aggregate snapshot; it does not query the warehouse on every interaction. "
-                     "The SQL benchmark and model evaluation are historical evidence, not new measurements."),
     ]
 
 
@@ -315,19 +315,12 @@ app.layout = html.Div([
             {"label": navigation_label("risk", "Motor risk & ML", "Patterns & model scores", "02"), "value": "risk"},
             {"label": navigation_label("database", "Data & performance", "Quality & SQL evidence", "03"), "value": "platform"},
         ], className="nav-items"), **{"aria-label": "Analytics sections"}),
-        html.Div([
-            html.Div("THE DATA FOUNDATION", className="nav-label"),
-            html.Div([html.Span("A", className="track-letter"), html.Div([html.Strong("SUSEP Market"), html.Small("8.34M market observations")])], className="source-track"),
-            html.Div([html.Span("B", className="track-letter"), html.Div([html.Strong("brvehins1"), html.Small("1.97M risk observations")])], className="source-track"),
-            html.P("Two independent sources.\nOne analytical workspace.", className="sidebar-note"),
-        ], className="sidebar-data"),
         html.Div([html.Span("PERSONAL PROJECT"), html.P("Insurance Data Platform"), html.Small("Data engineering · Analytics")], className="sidebar-footer"),
     ], className="sidebar"),
     html.Main([
         html.Header([html.Div([html.Span("Workspace"), html.Span("/", className="breadcrumb-divider"), html.Strong("Insurance analytics")], className="breadcrumb"),
                      html.Div(id="source-meta")], className="topbar"),
         html.Div(id="page-content"),
-        html.Footer([html.Span("Insurance Intelligence"), html.Span("SUSEP & brvehins1 · Independent source populations")]),
     ], className="workspace"),
 ], className="shell")
 
@@ -337,7 +330,7 @@ def render_page(section):
     try:
         return {"market": market_page, "risk": risk_page, "platform": platform_page}.get(section, market_page)(), provenance()
     except (OSError, ValueError, KeyError) as exc:
-        return html.Div([html.H1("A data snapshot is needed"), html.P(str(exc)), html.Code("python pipeline/manage.py export")], className="scope-note"), ""
+        return html.Div([html.H1("A data snapshot is needed"), html.P(str(exc)), html.Code("python pipeline/manage.py export")], className="snapshot-error"), ""
 
 
 @app.callback(Output("market-state", "value"), Output("market-years", "value"), Input("market-reset", "n_clicks"), prevent_initial_call=True)
@@ -370,10 +363,9 @@ def ranking_label(label, key):
             label = label.replace(term, "")
         label = re.sub(r"\s+S[./]?A[.]?\s*$", "", label)
         label = " ".join(label.split()).strip(" -/")
-        return label if len(label) <= 18 else label[:17].rstrip() + "…"
-    code, name = label.split(" · ", 1)
-    name = name if len(name) <= 19 else name[:18].rstrip() + "…"
-    return f"{code}<br>{name}"
+        return label if len(label) <= 22 else label[:21].rstrip() + "…"
+    code = label.split(" · ", 1)[0]
+    return PRODUCT_SHORT.get(code, PRODUCTS.get(code, "Line " + code))
 
 
 @app.callback(Output("market-metrics", "children"), Output("market-trend", "figure"), Output("market-companies", "figure"),
@@ -383,20 +375,23 @@ def update_market(state, years, grain="monthly"):
     monthly, companies, products = market_frames(state, years)
     premium, claims = monthly["premium"].sum(), monthly["claims"].sum()
     claim_ratio, observations = ratio(claims, premium), int(monthly["observations"].sum())
+    comparison = latest_market_comparison(monthly, state)
     cards = [
-        metric("Total premiums", number(premium), "Source units · selected period", symbol="premium", tone="teal", exact=f"{premium:,.2f}"),
-        metric("Total claims", number(claims), "Source units · reported claims", symbol="claims", tone="orange", exact=f"{claims:,.2f}"),
-        metric("Claims / premiums", number(claim_ratio, percent=True), "Ratio of totals within your selection", symbol="percent"),
+        metric("Total premiums", number(premium), "Source units · selected period", symbol="premium", exact=f"{premium:,.2f}",
+               comparison=market_change(comparison, "premium_change")),
+        metric("Total claims", number(claims), "Source units · reported claims", symbol="claims", tone="cost", exact=f"{claims:,.2f}"),
+        metric("Claims / premiums", number(claim_ratio, percent=True), "Ratio of totals within your selection", symbol="percent",
+               comparison=market_change(comparison, "ratio_change_pp", lower_is_better=True)),
         metric("Market observations", number(observations), f"{years[0]}–{years[1]} · {state if state != 'ALL' else 'All states'}", exact=f"{observations:,}"),
     ]
     trend = monthly.assign(period=monthly["month"].str[:4] if grain == "annual" else monthly["month"])
     trend = trend.groupby("period", as_index=False)[["premium", "claims"]].sum()
     annual = grain == "annual"
     plot = figure("Market trend " + grain, "Year" if annual else "Month", "Billions · source units")
-    for column, name, color in [("premium", "Premiums", TEAL), ("claims", "Claims", ORANGE)]:
+    for column, name, color in [("premium", "Premiums", BLUE), ("claims", "Claims", ORANGE)]:
         plot.add_scatter(x=trend["period"], y=trend[column] / 1e9, name=name, mode="lines+markers" if annual else "lines",
                          line=dict(color=color, width=2.6), marker=dict(size=5), fill="tozeroy" if column == "premium" else None,
-                         fillcolor="rgba(8,127,140,0.055)", hovertemplate=f"{name}: %{{y:,.2f}}B source units<extra></extra>")
+                         fillcolor="rgba(0,51,102,0.07)", hovertemplate=f"{name}: %{{y:,.2f}}B source units<extra></extra>")
     plot.update_layout(showlegend=False)
     plot.update_xaxes(type="category", nticks=8) if annual else plot.update_xaxes(type="date", tickformat="%Y", nticks=8)
     if monthly.empty:
@@ -409,12 +404,13 @@ def update_market(state, years, grain="monthly"):
         bars = figure("Ranking " + key, "", "")
         # Technical IDs keep distinct bars when abbreviated source labels coincide.
         bars.add_bar(x=ranked["premium"] / 1e9, y=ranked[key].astype(str), orientation="h",
-                     marker_color=[TEAL if i == len(ranked) - 1 else "#abcbd0" for i in range(len(ranked))], customdata=labels,
+                     marker_color=[BLUE if i == len(ranked) - 1 else PALE_BLUE for i in range(len(ranked))], customdata=labels,
                      text=[f"{v / 1e9:,.1f}" for v in ranked["premium"]], textposition="outside", cliponaxis=False,
                      hovertemplate="%{customdata}<br>Premiums: %{x:,.2f}B source units<extra></extra>")
-        bars.update_yaxes(type="category", tickvals=ranked[key].astype(str), ticktext=short, showgrid=False)
-        bars.update_xaxes(showgrid=True, gridcolor="#eef2f5", nticks=4, rangemode="tozero")
-        bars.update_layout(margin=dict(l=8, r=48, t=10, b=12), hovermode="closest", bargap=.36)
+        bars.update_yaxes(type="category", tickvals=ranked[key].astype(str), ticktext=short,
+                          showgrid=False, ticklabelstandoff=18, tickfont=dict(size=11))
+        bars.update_xaxes(showgrid=True, gridcolor=GRID, nticks=4, rangemode="tozero")
+        bars.update_layout(margin=dict(l=8, r=38, t=22, b=26), hovermode="closest", bargap=.38)
         if ranked.empty:
             empty_figure(bars)
         ranks.append(bars)
@@ -429,22 +425,22 @@ def update_risk(state):
     segments, scores = risk_frames(state)
     population, observations = int(scores["observations"].sum()), int(segments["observations"].sum())
     cards = [
-        metric("Risk observations", number(observations), "Full filtered risk warehouse", tone="teal", exact=f"{observations:,}"),
+        metric("Risk observations", number(observations), "Full filtered risk warehouse", exact=f"{observations:,}"),
         metric("Total exposure", number(segments["exposure"].sum()), "Exposure in source units", symbol="shield"),
-        metric("Claims / exposure", number(ratio(segments["claim_count"].sum(), segments["exposure"].sum())), "Claim count divided by total exposure", symbol="percent"),
-        metric("Mean model score", f"{scores['score_sum'].sum() / population:.3f}" if population else "—", f"{population:,} filtered held-out observations", symbol="risk", tone="teal"),
+        metric("Claims / exposure", number(ratio(segments["claim_count"].sum(), segments["exposure"].sum())), "Claim count divided by total exposure", symbol="percent", tone="cost"),
+        metric("Mean model score", f"{scores['score_sum'].sum() / population:.3f}" if population else "—", f"{population:,} filtered held-out observations", symbol="risk"),
     ]
     scores = scores.assign(band=scores["band"].clip(upper=19))
     bands = scores.groupby("band", as_index=False)[["observations", "score_sum", "positives"]].sum()
     x = (bands["band"] + .5) / 20
     distribution = figure("Score distribution", "Model score", "Held-out observations")
-    distribution.add_bar(x=x, y=bands["observations"], width=.038, marker_color=[TEAL if b < 4 else "#abcbd0" for b in bands["band"]],
+    distribution.add_bar(x=x, y=bands["observations"], width=.038, marker_color=[BLUE if b < 4 else PALE_BLUE for b in bands["band"]],
                          customdata=list(zip(bands["band"] / 20, (bands["band"] + 1) / 20)),
                          hovertemplate="Score band: %{customdata[0]:.2f}–%{customdata[1]:.2f}<br>Observations: %{y:,}<extra></extra>")
     distribution.update_xaxes(range=[0, 1], dtick=.2)
     observed = figure("Observed claim share", "Model score band", "Share / score (%)")
     for values, name, color, dash in [
-        (100 * bands["positives"] / bands["observations"], "Observed HasClaim", TEAL, "solid"),
+        (100 * bands["positives"] / bands["observations"], "Observed HasClaim", BLUE, "solid"),
         (100 * bands["score_sum"] / bands["observations"], "Mean model score", ORANGE, "dash"),
     ]:
         observed.add_scatter(x=x, y=values, mode="lines+markers", name=name, customdata=bands["observations"],
@@ -465,12 +461,12 @@ def update_risk(state):
     gender = gender.groupby("gender", as_index=False)["observations"].sum().sort_values("observations")
     gender_plot = figure("Profile labels", "Observations", "")
     gender_plot.add_bar(x=gender["observations"], y=gender["gender"], orientation="h",
-                        marker_color=["#c7d2dc" if g == "Unknown" else "#6da7b0" for g in gender["gender"]],
+                        marker_color=["#c7d2dc" if g == "Unknown" else TEAL for g in gender["gender"]],
                         text=[number(v) for v in gender["observations"]], textposition="outside", cliponaxis=False,
                         hovertemplate="%{y}<br>Observations: %{x:,}<extra></extra>")
     gender_plot.update_layout(margin=dict(r=65), bargap=.48)
-    gender_plot.update_yaxes(showgrid=False)
-    gender_plot.update_xaxes(showgrid=True, gridcolor="#eef2f5", nticks=4)
+    gender_plot.update_yaxes(showgrid=False, ticklabelstandoff=14)
+    gender_plot.update_xaxes(showgrid=True, gridcolor=GRID, nticks=4)
     for chart in (distribution, observed):
         if not population:
             empty_figure(chart)

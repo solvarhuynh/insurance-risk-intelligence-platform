@@ -14,7 +14,7 @@ def csv_download(page, button):
     return list(csv.DictReader(io.StringIO(Path(download.value.path()).read_text(encoding="utf-8"))))
 
 
-def check(base_url: str, screenshot: bool) -> None:
+def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) -> None:
     errors = []
     labels = ("Market", "Motor risk", "Data")
     with sync_playwright() as playwright:
@@ -26,6 +26,8 @@ def check(base_url: str, screenshot: bool) -> None:
         page.locator("#market-metrics .metric strong").first.wait_for()
         expect(page.locator("#market-metrics .metric strong").first).to_have_text("3.05T")
         expect(page.locator("#market-takeaway")).to_contain_text("24.1%")
+        expect(page.locator("#market-story")).to_contain_text("63.2%")
+        assert page.evaluate("document.querySelector('#market-trend .js-plotly-plot').layout.showlegend")
         assert page.locator("html").get_attribute("lang") == "en"
         assert page.locator(".sidebar-footer, .nav-copy, .nav-number").count() == 0
         assert page.evaluate("getComputedStyle(document.querySelector('.metric')).textAlign") == "center"
@@ -79,11 +81,16 @@ def check(base_url: str, screenshot: bool) -> None:
         page.locator("#section label").filter(has_text=labels[1]).click()
         page.locator("#risk-metrics .metric strong").first.wait_for()
         expect(page.locator("#risk-takeaway")).to_contain_text("67.6%")
+        assert page.locator("#risk-metrics .metric").count() == 3
+        expect(page.locator("#risk-model-metric")).to_contain_text("20,000 filtered held-out")
+        expect(page.locator("#risk-story")).to_contain_text("69.9%")
+        assert page.evaluate("document.querySelector('#risk-distribution .js-plotly-plot').data[0].width") == .05
         assert page.locator("#risk-distribution .main-svg").count() > 0
         model_metrics = page.locator(".model-summary").inner_text()
         page.locator("#risk-state input").fill("SP")
         page.get_by_text("SP · São Paulo", exact=True).click()
         expect(page.locator("#risk-takeaway")).to_contain_text("45.0%")
+        expect(page.locator("#risk-model-metric")).not_to_contain_text("20,000 filtered held-out")
         assert model_metrics == page.locator(".model-summary").inner_text()
         risk_rows = csv_download(page, "#risk-export")
         assert risk_rows and {row["state"] for row in risk_rows} == {"SP"}
@@ -96,19 +103,49 @@ def check(base_url: str, screenshot: bool) -> None:
         page.locator("#section label").filter(has_text=labels[2]).click()
         page.get_by_role("heading", name="See the data behind the platform", exact=True).wait_for()
         expect(page.locator("#data-count")).to_have_text("6,669 aggregate rows")
+        page.wait_for_function("document.querySelector('.benchmark-card .js-plotly-plot')?.data?.length === 2")
+        page.wait_for_load_state("networkidle")
         assert page.locator("#data-table tbody tr").count() == 15
         expect(page.locator("#data-table tbody tr").first).to_contain_text("2023-07")
         page.locator("#data-next").click()
-        expect(page.locator("#data-page-status")).to_contain_text("Page 2")
+        try:
+            expect(page.locator("#data-page-status")).to_contain_text("Page 2")
+        except AssertionError:
+            print("Navigation diagnostic:", page.url, page.locator("h1").all_text_contents(), errors)
+            if screenshots_dir:
+                screenshots_dir.mkdir(parents=True, exist_ok=True)
+                page.screenshot(path=str(screenshots_dir / "failure.png"), full_page=True)
+            raise
         page.locator("#data-track label").filter(has_text="Motor risk").click()
         expect(page.locator("#data-count")).to_have_text("644 aggregate rows")
         expect(page.locator("#data-table thead")).to_contain_text("HasClaim share")
         expect(page.locator("#data-page-status")).to_contain_text("Page 1")
         page.locator("#data-state input").fill("SP")
         page.get_by_text("SP · São Paulo", exact=True).click()
-        page.wait_for_function("[...document.querySelectorAll('#data-table tbody tr')].every(row => row.cells[0].textContent === 'SP')")
+        page.wait_for_function("""() => {
+            const rows = [...document.querySelectorAll('#data-table tbody tr')];
+            return rows.length > 0 && rows.every(row => row.cells[0].textContent === 'SP');
+        }""")
         assert page.locator("#data-prev").is_disabled()
         expect(page.locator(".benchmark-card")).to_contain_text("24 September 2026")
+        assert page.evaluate("document.querySelector('.benchmark-card .js-plotly-plot').layout.xaxis.type") == "linear"
+        assert page.evaluate("document.querySelector('.benchmark-card .js-plotly-plot').layout.xaxis.range[0]") == 0
+        page.locator("#data-state input").fill("All states")
+        page.locator("#data-state .VirtualizedSelectOption").filter(has_text="All states").click()
+        page.locator("#data-track label").filter(has_text="SUSEP market").click()
+        expect(page.locator("#data-count")).to_have_text("6,669 aggregate rows")
+        # Check real rendered hover content, including units and population.
+        for graph_id, point, expected in (("risk-observed", 5, "Band size:"),
+                                          ("risk-age", 2, "HasClaim count:"),
+                                          ("market-companies", 9, "of all selected premiums")):
+            label = labels[0] if graph_id.startswith("market") else labels[1]
+            page.locator("#section label").filter(has_text=label).click()
+            page.locator(f"#{graph_id} .main-svg").first.wait_for()
+            page.wait_for_function("id => document.querySelector('#' + id + ' .js-plotly-plot')?.data?.length > 0", arg=graph_id)
+            page.evaluate("""({id, point}) => Plotly.Fx.hover(document.querySelector('#' + id + ' .js-plotly-plot'),
+                [{curveNumber: 0, pointNumber: point}])""", {"id": graph_id, "point": point})
+            expect(page.locator(f"#{graph_id} .hoverlayer")).to_contain_text(expected)
+            page.evaluate("id => Plotly.Fx.unhover(document.querySelector('#' + id + ' .js-plotly-plot'))", graph_id)
         for width in (390, 768, 1024, 1440, 1920):
             page.set_viewport_size({"width": width, "height": 1000})
             for label, title in zip(labels, ("Insurance market overview", "Motor risk & model insights", "See the data behind the platform")):
@@ -124,15 +161,33 @@ def check(base_url: str, screenshot: bool) -> None:
                 for chart in page.locator(".chart").all():
                     assert chart.bounding_box()["width"] >= 240, f"Unusable chart width: {width}, {label}"
                 assert "Không rõ" not in page.locator("body").inner_text()
+                assert page.locator("#data-table").count() == (1 if label == "Data" else 0)
+                assert page.locator("#risk-model-metric").count() == (1 if label == "Motor risk" else 0)
+                if screenshots_dir:
+                    screenshots_dir.mkdir(parents=True, exist_ok=True)
+                    stem = ("market", "risk", "data")[labels.index(label)]
+                    # Capture the resting view after hover, keyboard, and scrolled chart checks.
+                    page.mouse.move(0, 0)
+                    page.evaluate("document.activeElement?.blur(); window.scrollTo(0, 0)")
+                    page.screenshot(path=str(screenshots_dir / f"{stem}-{width}.png"), full_page=True)
+                    if width == 1440:
+                        for chart_id in (("market-trend", "market-companies", "market-products") if stem == "market"
+                                         else ("risk-distribution", "risk-observed") if stem == "risk" else ()):
+                            page.locator(".chart-card").filter(has=page.locator(f"#{chart_id}")).screenshot(
+                                path=str(screenshots_dir / f"{chart_id}.png"))
+                        if stem == "data":
+                            page.locator(".data-panel").screenshot(path=str(screenshots_dir / "data-explorer.png"))
+                            page.locator(".benchmark-card").screenshot(path=str(screenshots_dir / "sql-benchmark.png"))
         assert not errors, errors
         assert page.request.get(base_url + "/healthz").json()["status"] == "ok"
         browser.close()
-    print("PASS: 3 English pages; monthly/annual totals; geography/year filters; resets; CSV/PNG exports; fixed historical metrics; 5 widths; local font; health; no browser/HTTP errors.")
+    print("PASS: 3 English pages; population grouping; monthly/annual totals; geography/year filters; resets; CSV/PNG exports; hover; histogram width; zero-baseline SQL bars; fixed historical metrics; 5 widths; local font; health; no browser/HTTP errors.")
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--url", default="http://127.0.0.1:8050")
     parser.add_argument("--screenshot", action="store_true")
+    parser.add_argument("--screenshots-dir", type=Path, help="Optional output directory for all pages at five widths and README chart crops")
     args = parser.parse_args()
-    check(args.url, args.screenshot)
+    check(args.url, args.screenshot, args.screenshots_dir)

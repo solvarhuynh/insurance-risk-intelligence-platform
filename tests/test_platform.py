@@ -10,7 +10,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "pipeline"))
 
-from dashboard.app import explorer_page, market_change, ratio, update_market, update_risk
+from dashboard.app import explorer_page, market_change, platform_page, ratio, update_market, update_risk
 from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
 from manage import migration_paths, sql_batches
 
@@ -41,8 +41,8 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual(set(scores.state), {"SP"})
         self.assertLess(scores.observations.sum(), 20_000)
         empty = update_risk("UNKNOWN_STATE")
-        self.assertEqual(len(empty[1].data[0].y), 0)
-        self.assertEqual(empty[-1], "No held-out scores match this selection")
+        self.assertEqual(sum(empty[1].data[0].y), 0)
+        self.assertEqual(empty[5], "No held-out scores match this selection")
 
     def test_ratio_and_callback_figures(self):
         self.assertIsNone(ratio(4, 0))
@@ -93,6 +93,51 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual(len(rows), 15)
         self.assertIn("HasClaim share", headings)
         self.assertNotIn("PolicyId", headings)
+
+    def test_score_bins_preserve_counts_and_observed_denominators(self):
+        for state in ("ALL", "SP", "AC"):
+            with self.subTest(state=state):
+                scores = risk_frames(state)[1]
+                _, distribution, observed, *_ = update_risk(state)
+                self.assertEqual(len(distribution.data[0].x), 20)
+                self.assertAlmostEqual(float(distribution.data[0].width), .05)
+                self.assertEqual(sum(distribution.data[0].y), scores.observations.sum())
+                self.assertAlmostEqual(distribution.data[0].x[0] - .025, 0)
+                self.assertAlmostEqual(distribution.data[0].x[-1] + .025, 1)
+                recovered_positives = recovered_scores = 0
+                for count, share, mean, detail in zip(distribution.data[0].y, observed.data[0].y,
+                                                       observed.data[1].y, observed.data[0].customdata):
+                    self.assertEqual(count, detail[2])
+                    if count:
+                        recovered_positives += count * share / 100
+                        recovered_scores += count * mean / 100
+                    else:
+                        self.assertTrue(pd.isna(share) and pd.isna(mean))
+                self.assertAlmostEqual(recovered_positives, scores.positives.sum())
+                self.assertAlmostEqual(recovered_scores, scores.score_sum.sum())
+                self.assertFalse(observed.data[0].connectgaps)
+
+    def test_age_reference_uses_filtered_ratio_of_sums(self):
+        for state in ("ALL", "SP"):
+            segments = risk_frames(state)[0]
+            age = update_risk(state)[3]
+            self.assertAlmostEqual(age.layout.shapes[0].y0, 100 * segments.has_claim.sum() / segments.observations.sum())
+            self.assertEqual(sum(row[0] for row in age.data[0].customdata), segments.observations.sum())
+            self.assertEqual(sum(row[1] for row in age.data[0].customdata), segments.has_claim.sum())
+
+    def test_benchmark_encodes_actual_reads_from_zero(self):
+        benchmark = platform_page()[-1].children[1].children[0].children.figure
+        self.assertEqual(benchmark.layout.xaxis.type, "linear")
+        self.assertEqual(benchmark.layout.xaxis.range[0], 0)
+        for series, field in zip(benchmark.data, ("before_reads", "after_reads")):
+            self.assertEqual(list(series.x), [row[field] for row in snapshot()["performance"]])
+
+    def test_ranking_shares_use_all_premiums_not_only_top_n(self):
+        result = update_market("SP", [2018, 2020])
+        total = market_frames("SP", [2018, 2020])[0].premium.sum()
+        for chart in result[2:4]:
+            for premium_billions, detail in zip(chart.data[0].x, chart.data[0].customdata):
+                self.assertAlmostEqual(float(detail[1]), 100 * premium_billions * 1e9 / total)
 
 
 if __name__ == "__main__":

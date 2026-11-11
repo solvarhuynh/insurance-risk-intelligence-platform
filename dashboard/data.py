@@ -16,14 +16,14 @@ ROOT = Path(__file__).resolve().parent.parent
 def _read(path: str, modified_ns: int) -> dict:
     payload = json.loads(Path(path).read_text(encoding="utf-8"))
     if payload.get("schema_version") != 1:
-        raise ValueError("Snapshot không tương thích. Chạy pipeline/export_dashboard.py.")
+        raise ValueError("Incompatible snapshot. Run python pipeline/manage.py export.")
     return payload
 
 
 def snapshot() -> dict:
     path = Path(os.getenv("DASHBOARD_DATA_PATH", str(ROOT / "data/dashboard.json")))
     if not path.is_file():
-        raise FileNotFoundError("Chưa có data/dashboard.json. Chạy python pipeline/export_dashboard.py.")
+        raise FileNotFoundError("Missing data/dashboard.json. Run python pipeline/manage.py export.")
     return _read(str(path), path.stat().st_mtime_ns)
 
 

@@ -1,10 +1,11 @@
-"""Run with: python -m dashboard.app."""
+"""Insurance analytics workspace. Run with: python -m dashboard.app."""
 
 from __future__ import annotations
 
 import os
-from datetime import datetime
-from datetime import timezone, timedelta
+import re
+from datetime import datetime, timedelta, timezone
+from urllib.parse import quote
 
 import pandas as pd
 import plotly.graph_objects as go
@@ -12,9 +13,52 @@ from dash import Dash, Input, Output, State, dcc, html, no_update
 
 from dashboard.data import market_frames, risk_frames, snapshot, table
 
-TEAL, ORANGE, NAVY = "#147d78", "#dc9250", "#182f40"
-app = Dash(__name__, title="Insurance Intelligence · Analytics", suppress_callback_exceptions=True)
+TEAL, ORANGE, INK, MUTED = "#087f8c", "#db8856", "#172b3a", "#718096"
+STATES = {
+    "AC": "Acre", "AL": "Alagoas", "AM": "Amazonas", "AP": "Amapá", "BA": "Bahia",
+    "CE": "Ceará", "DF": "Federal District", "ES": "Espírito Santo", "GO": "Goiás",
+    "MA": "Maranhão", "MG": "Minas Gerais", "MS": "Mato Grosso do Sul", "MT": "Mato Grosso",
+    "PA": "Pará", "PB": "Paraíba", "PE": "Pernambuco", "PI": "Piauí", "PR": "Paraná",
+    "RJ": "Rio de Janeiro", "RN": "Rio Grande do Norte", "RO": "Rondônia", "RR": "Roraima",
+    "RS": "Rio Grande do Sul", "SC": "Santa Catarina", "SE": "Sergipe", "SP": "São Paulo", "TO": "Tocantins",
+}
+# Official line codes stay visible; the snapshot retains the original source names.
+PRODUCTS = {
+    "0111": "Fire", "0114": "Home insurance", "0116": "Condominium", "0118": "Business insurance",
+    "0141": "Business interruption", "0167": "Engineering risks", "0171": "Miscellaneous risks",
+    "0195": "Extended warranty", "0196": "Named & operational risks", "0351": "General liability",
+    "0531": "Motor own damage", "0553": "Motor liability", "0588": "DPVAT motor cover",
+    "0775": "Public-sector surety", "0776": "Private-sector surety", "0977": "Credit life",
+    "0982": "Personal accident", "0991": "Individual life", "0992": "Individual VGBL plans",
+    "0993": "Group life", "0994": "VGBL plans", "1391": "Life insurance", "1392": "VGBL & related plans",
+}
+ICONS = {
+    "grid": '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    "risk": '<path d="M3 18l5-6 4 3 8-10M15 5h5v5M3 22h18"/>',
+    "database": '<ellipse cx="12" cy="5" rx="8" ry="3"/><path d="M4 5v7c0 4 16 4 16 0V5M4 12v7c0 4 16 4 16 0v-7"/>',
+    "shield": '<path d="M12 2l8 3v6c0 5-4 8-8 11-4-3-8-6-8-11V5zM8 12l3 3 5-6"/>',
+    "download": '<path d="M12 3v12m-5-5l5 5 5-5M4 16v5h16v-5"/>',
+    "calendar": '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M7 3v5m10-5v5M3 11h18m-13 4h2m4 0h2"/>',
+    "globe": '<circle cx="12" cy="12" r="9"/><ellipse cx="12" cy="12" rx="4" ry="9"/><path d="M3 12h18"/>',
+    "premium": '<path d="M4 20V10m6 10V5m6 15v-7m5 7H2M3 6l6-4 7 5 5-4"/>',
+    "claims": '<path d="M8 3H5v18h14V7l-4-4H8zM14 3v5h5M8 12h7m-7 4h7"/>',
+    "percent": '<circle cx="6.5" cy="6.5" r="3"/><circle cx="17.5" cy="17.5" r="3"/><path d="M4 20L20 4"/>',
+    "rows": '<path d="M8 5h13M8 12h13M8 19h13M3 5h.01M3 12h.01M3 19h.01"/>',
+    "reset": '<path d="M3 10a9 9 0 1 1 2 8M3 4v6h6"/>',
+    "check": '<path d="M5 12l4 4L19 6"/>',
+    "info": '<circle cx="12" cy="12" r="9"/><path d="M12 11v6m0-10h.01"/>',
+}
+
+app = Dash(__name__, title="Insurance Intelligence | Analytics", suppress_callback_exceptions=True,
+           update_title=None, meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}])
 server = app.server
+app.index_string = app.index_string.replace("<html>", '<html lang="en">')
+
+
+def icon(name):
+    svg = f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="black" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">{ICONS[name]}</svg>'
+    mask = f'url("data:image/svg+xml,{quote(svg)}")'
+    return html.Span(className="icon", style={"maskImage": mask, "WebkitMaskImage": mask}, **{"aria-hidden": "true"})
 
 
 def number(value: float | None, *, percent: bool = False) -> str:
@@ -22,215 +66,442 @@ def number(value: float | None, *, percent: bool = False) -> str:
         return "—"
     if percent:
         return f"{value * 100:.1f}%"
-    for divisor, unit in ((1e12, "nghìn tỷ"), (1e9, "tỷ"), (1e6, "triệu"), (1e3, "nghìn")):
+    for divisor, unit in ((1e12, "T"), (1e9, "B"), (1e6, "M"), (1e3, "K")):
         if abs(value) >= divisor:
-            return f"{value/divisor:,.2f} {unit}"
+            return f"{value / divisor:,.2f}{unit}"
     return f"{value:,.3f}" if value != 0 and abs(value) < 1 else f"{value:,.0f}"
 
 
-def ratio(numerator: float, denominator: float) -> float | None:
+def ratio(numerator, denominator):
     return numerator / denominator if denominator > 0 else None
 
 
-def metric(label: str, value: str, detail: str, accent: bool = False):
-    return html.Div([html.Span(label, className="metric-label"), html.Strong(value), html.Small(detail)], className="metric accent" if accent else "metric")
+def metric(label, value, detail, *, symbol="rows", tone="neutral", exact=None):
+    display = [value[:-3], html.Span("MB", className="metric-unit")] if value.endswith(" MB") else value
+    return html.Div([
+        html.Div([html.Span(label, className="metric-label"), icon(symbol)], className="metric-top"),
+        html.Strong(display, title=str(exact) if exact is not None else value), html.Small(detail),
+    ], className=f"metric {tone}")
 
 
-def figure(title: str, x: str, y: str) -> go.Figure:
+def figure(key, x, y):
     chart = go.Figure()
     chart.update_layout(
-        template="plotly_white", title=None, height=330,
-        margin=dict(l=16, r=20, t=20, b=35), font=dict(family="Segoe UI, Arial, sans-serif", color="#536574", size=12),
+        template="plotly_white", title=None, autosize=True,
+        margin=dict(l=12, r=24, t=24, b=12),
+        font=dict(family="Inter, Segoe UI, sans-serif", color=MUTED, size=12),
         paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-        xaxis=dict(title=x, showgrid=False, zeroline=False),
-        yaxis=dict(title=y, gridcolor="#edf0f1", zeroline=False),
-        legend=dict(orientation="h", y=1.16, x=0, title=None),
-        hovermode="x unified", uirevision=title,
+        xaxis=dict(title=dict(text=x, standoff=16), showgrid=False, zeroline=False, automargin=True,
+                   tickfont=dict(size=11)),
+        yaxis=dict(title=dict(text=y, standoff=12), gridcolor="#eaf0f3", zeroline=False,
+                   automargin=True, tickfont=dict(size=11), nticks=5),
+        legend=dict(orientation="h", y=1.16, x=0, title=None, font=dict(size=11)),
+        hovermode="x unified", hoverlabel=dict(bgcolor="white", font_size=12, font_color=INK),
+        uirevision=key, separators=".,", bargap=.32,
     )
     return chart
 
 
-def chart_card(title: str, subtitle: str, graph_id: str, *, wide: bool = False):
+def graph(graph_id=None, *, chart=None):
+    props = {"id": graph_id} if graph_id else {}
+    if chart is not None:
+        props["figure"] = chart
+    return html.Div(dcc.Graph(**props, className="chart", responsive=True,
+                             config={"displayModeBar": "hover", "displaylogo": False, "scrollZoom": False,
+                                     "modeBarButtonsToRemove": ["select2d", "lasso2d", "autoScale2d"],
+                                     "toImageButtonOptions": {"format": "png", "scale": 2}}), className="chart-frame")
+
+
+def chart_card(title, subtitle, graph_id, *, wide=False, controls=None, headline_id=None, footer=None):
+    heading = html.H2(title, id=headline_id) if headline_id else html.H2(title)
     return html.Section([
-        html.Div([html.H3(title), html.P(subtitle)], className="chart-heading"),
-        dcc.Graph(id=graph_id, style={"height":"350px"}, config={"displayModeBar": False, "responsive": True}),
+        html.Div([html.Div([heading, html.P(subtitle)]), controls], className="chart-heading"), graph(graph_id),
+        html.Div(footer, className="chart-footnote") if footer else None,
     ], className="chart-card wide" if wide else "chart-card")
 
 
-def page_header(kicker: str, title: str, description: str):
-    return html.Div([html.Div(kicker, className="eyebrow"), html.H1(title), html.P(description)], className="page-heading")
+def page_header(kicker, title, description, scope_label, scope_value, scope_note):
+    return html.Div([
+        html.Div([html.Div(kicker, className="eyebrow"), html.H1(title), html.P(description)]),
+        html.Div([html.Span(scope_label), html.Strong(scope_value), html.Small(scope_note)], className="coverage"),
+    ], className="page-heading")
 
 
 def provenance():
-    data = snapshot()
-    instant = datetime.fromisoformat(data["exported_at_utc"]).astimezone(timezone(timedelta(hours=7)))
+    instant = datetime.fromisoformat(snapshot()["exported_at_utc"]).astimezone(timezone(timedelta(hours=7)))
+    return html.Div([html.Span("Historical snapshot", className="snapshot-badge"),
+                     html.Span(f"Exported {instant:%d %b %Y, %H:%M} UTC+7", className="snapshot-time")], className="provenance")
+
+
+def state_filter(track, states):
     return html.Div([
-        html.Span("BẢN CHỤP SQL SERVER", className="source-tag"),
-        html.Span(f"Xuất lúc {instant:%d/%m/%Y · %H:%M} (UTC+7)"),
-        html.Span("Dữ liệu lịch sử · Không phải dữ liệu thời gian thực", className="source-note"),
-    ], className="provenance")
+        html.Label([icon("globe"), "Geography"], htmlFor=f"{track}-state"),
+        dcc.Dropdown(id=f"{track}-state", options=[{"label": "All states", "value": "ALL"}] + [
+            {"label": f"{s} · {STATES.get(s, 'Unknown')}", "value": s} for s in states
+        ], value="ALL", clearable=False, persistence=True, persistence_type="session"),
+    ], className="filter-select")
+
+
+def export_button(track):
+    return html.Div([html.Button([icon("download"), "Export CSV"], id=f"{track}-export", className="button primary"),
+                     dcc.Download(id=f"{track}-download")], className="export-action")
+
+
+def reading_note(title, text):
+    return html.Details([html.Summary([icon("info"), title, html.Span("+", className="details-toggle")]), html.P(text)],
+                        className="reading-note")
 
 
 def market_page():
     monthly = table("market", "monthly")
     years = sorted(monthly["month"].str[:4].astype(int).unique())
-    states = sorted(monthly["state"].unique())
     return [
-        page_header("TRACK A / INSURANCE MARKET", "Bức tranh thị trường bảo hiểm", "Theo dõi phí bảo hiểm, bồi thường và cơ cấu thị trường từ nguồn SUSEP Brazil."),
+        page_header("MARKET INTELLIGENCE / TRACK A", "Insurance market overview",
+                    "Understand premium volume, claims and the companies shaping Brazil’s insurance market.",
+                    "SOURCE COVERAGE", "Jan 2003 — Jul 2023", "SUSEP · 27 Brazilian states"),
         html.Div([
-            html.Div([html.Label("Khu vực", htmlFor="market-state"), dcc.Dropdown(id="market-state", options=[{"label": "Tất cả các bang", "value": "ALL"}] + [{"label": s, "value": s} for s in states], value="ALL", clearable=False)], className="filter-select"),
-            html.Div([html.Label("Giai đoạn", htmlFor="market-years"), dcc.RangeSlider(id="market-years", min=int(years[0]), max=int(years[-1]), step=1, value=[int(years[0]),int(years[-1])], marks={int(y): str(y) for y in years if y % 5 == 0 or y in (years[0],years[-1])}, tooltip={"placement":"bottom","always_visible":False})], className="filter-range"),
-            html.Button("Tải CSV ↓", id="market-export", className="button secondary"), dcc.Download(id="market-download"),
+            state_filter("market", sorted(monthly["state"].unique())),
+            html.Div([
+                html.Label([icon("calendar"), "Year range"], htmlFor="market-years"),
+                dcc.RangeSlider(id="market-years", min=int(years[0]), max=int(years[-1]), step=1,
+                                value=[int(years[0]), int(years[-1])],
+                                marks={int(y): str(y) for y in years if y % 5 == 0 or y in (years[0], years[-1])},
+                                tooltip={"placement": "bottom", "always_visible": False},
+                                persistence=True, persistence_type="session"),
+            ], className="filter-range"),
+            html.Button([icon("reset"), "Reset"], id="market-reset", className="button quiet"), export_button("market"),
         ], className="filter-bar"),
-        dcc.Loading(html.Div(id="market-metrics", className="metrics"), type="dot", color=TEAL),
+        html.Div(id="market-metrics", className="metrics", **{"aria-live": "polite"}),
         html.Div([
-            chart_card("Phí bảo hiểm & bồi thường", "Xu hướng theo tháng trong phạm vi đã chọn · Đơn vị nguồn", "market-trend", wide=True),
-            chart_card("Doanh nghiệp dẫn đầu", "10 doanh nghiệp có tổng phí lớn nhất · Đơn vị nguồn", "market-companies"),
-            chart_card("Cơ cấu sản phẩm", "8 nhóm sản phẩm có tổng phí lớn nhất · Đơn vị nguồn", "market-products"),
+            chart_card("Premiums and claims, in perspective",
+                       "Compare reported premiums and claims over the selected period. Values in billions of source units.",
+                       "market-trend", wide=True, headline_id="market-takeaway",
+                       controls=dcc.RadioItems(id="market-grain", options=[{"label": "Monthly", "value": "monthly"},
+                                              {"label": "Annual", "value": "annual"}], value="monthly", className="segmented"),
+                       footer=[html.Span(className="legend-dot teal"), "Premiums", html.Span(className="legend-dot orange"), "Claims",
+                               html.Span("2023 includes January–July only", className="chart-caveat")]),
+            chart_card("Which companies lead premium volume?",
+                       "Top 10 insurers within your selection. Hover for the full source company name.",
+                       "market-companies", footer="Premiums · billions of source units"),
+            chart_card("Where is premium volume concentrated?",
+                       "Top 8 product lines within your selection. Labels include official SUSEP line codes.",
+                       "market-products", footer="Premiums · billions of source units"),
         ], className="chart-grid"),
-        html.Div([html.Strong("Đọc dữ liệu đúng cách. "), "Tỷ lệ bồi thường = tổng claims / tổng premiums, chỉ hiển thị khi tổng premiums > 0. Giá trị âm được giữ theo nguồn. Năm 2023 chỉ có đến tháng 07; không so trực tiếp cả năm với các năm đủ 12 tháng."], className="insight-note"),
+        reading_note("How to read these market figures",
+                     "Claims / premiums is the ratio of the two totals, shown only when premiums are positive. "
+                     "Monetary units have not been independently confirmed; values remain in source units. "
+                     "Negative adjustments are retained. The 2023 total covers January–July and is not a full-year comparison. "
+                     "The CSV contains the filtered monthly/state aggregates."),
     ]
 
 
 def risk_page():
-    states = sorted(table("risk", "segments")["state"].unique())
     metrics = snapshot()["model_metrics"]
     return [
-        page_header("TRACK B / MOTOR RISK & ML", "Hiểu rủi ro từ quan sát thực tế", "Phân tích motor-risk và điểm mô hình trên tập held-out riêng từ brvehins1."),
+        page_header("MOTOR ANALYTICS / TRACK B", "Motor risk & model insights",
+                    "Explore observed claim patterns and model scores in an independent motor insurance dataset.",
+                    "MODEL EVALUATION", f"{metrics['rows']:,} held-out observations", "Historical evaluation · September 2026"),
         html.Div([
-            html.Div([html.Label("Khu vực", htmlFor="risk-state"), dcc.Dropdown(id="risk-state", options=[{"label":"Tất cả khu vực","value":"ALL"}]+[{"label":s,"value":s} for s in states], value="ALL", clearable=False)], className="filter-select"),
-            html.Div([html.Span(f"ROC-AUC {metrics['roc_auc']:.3f}"), html.Span(f"Average precision {metrics['average_precision']:.3f}"), html.Small("Toàn bộ held-out · Không đổi theo bộ lọc khu vực")], className="model-summary"),
-            html.Button("Tải CSV ↓", id="risk-export", className="button secondary"), dcc.Download(id="risk-download"),
-        ], className="filter-bar"),
-        html.Div(id="risk-metrics", className="metrics"),
+            state_filter("risk", sorted(table("risk", "segments")["state"].unique())),
+            html.Div([
+                html.Div([html.Span("ROC-AUC"), html.Strong(f"{metrics['roc_auc']:.3f}")]),
+                html.Div([html.Span("Average precision"), html.Strong(f"{metrics['average_precision']:.3f}")]),
+                html.Small("Full held-out set · historical metrics · unaffected by geography"),
+            ], className="model-summary"),
+            html.Button([icon("reset"), "Reset"], id="risk-reset", className="button quiet"), export_button("risk"),
+        ], className="filter-bar risk-filter"),
+        html.Div(id="risk-metrics", className="metrics", **{"aria-live": "polite"}),
         html.Div([
-            chart_card("Phân bố điểm mô hình", "Số quan sát held-out trong từng dải điểm", "risk-distribution"),
-            chart_card("Điểm số & kết quả quan sát", "Tỷ lệ có claim đã quan sát theo dải điểm · Held-out", "risk-observed"),
-            chart_card("Rủi ro theo nhóm tuổi", "Tỷ lệ quan sát có claim · Toàn bộ risk DWH", "risk-age"),
-            chart_card("Phân bố nhóm hồ sơ", "Nhãn Gender gốc từ dữ liệu · Toàn bộ risk DWH", "risk-gender"),
+            chart_card("Where model scores are concentrated", "Filtered held-out observations, grouped into 0.05-wide model score bands.",
+                       "risk-distribution", headline_id="risk-takeaway"),
+            chart_card("How scores relate to observed claims", "Observed HasClaim share and mean model score within each held-out score band.", "risk-observed"),
+            chart_card("Observed claim share varies by age group", "Share of observations with HasClaim, across the full filtered risk warehouse.", "risk-age"),
+            chart_card("The observation mix behind the analysis", "Counts by source Gender label, including corporate and unknown records.", "risk-gender"),
         ], className="chart-grid"),
-        html.Div([html.Strong("Giới hạn của mô hình. "), "Điểm thể hiện liên hệ với HasClaim trong dữ liệu cùng thời điểm. Tập scoring chỉ có 20.000 quan sát held-out, có thể ít hơn sau lọc. Không diễn giải thành xác suất claim tương lai của khách hàng hoặc hợp đồng. Exposure và claim count chỉ áp dụng cho Track B."], className="insight-note"),
+        html.Div([icon("shield"), html.Div([html.Strong("Model scope"),
+                  html.P("Scores describe cross-sectional association with HasClaim. They are not validated probabilities of future claims. "
+                         "The risk warehouse and held-out scoring sample are separate populations.")])], className="scope-note"),
+        reading_note("Population, exposure and model interpretation",
+                     "The geography filter applies separately to warehouse aggregates and the existing held-out predictions. "
+                     "Claim frequency is total claim count divided by total exposure in source units. "
+                     "ROC-AUC and average precision are fixed historical results for the full held-out set. "
+                     "The score comparison is descriptive and does not establish calibration or causality. "
+                     "Unknown labels remain visible. The CSV contains state/profile/age aggregates, not individual predictions."),
     ]
+
+
+def reconciliation_table(counts):
+    rows = []
+    for label, detail, prefix in [("SUSEP Market", "Company / month / product / state", "market"),
+                                  ("brvehins1 Motor Risk", "Aggregate motor-risk observations", "risk")]:
+        staging, fact = counts[f"{prefix}_staging"], counts[f"{prefix}_fact"]
+        matched = staging == fact
+        rows.append(html.Tr([
+            html.Td([html.Strong(label), html.Small(detail)]),
+            html.Td(f"{staging:,}", className="numeric"), html.Td(f"{fact:,}", className="numeric"),
+            html.Td(f"{fact - staging:+,}" if fact != staging else "0", className="numeric"),
+            html.Td(html.Span([icon("check") if matched else icon("info"), "Matched" if matched else "Review"],
+                              className="reconcile-status matched" if matched else "reconcile-status review")),
+        ]))
+    return html.Div(html.Table([
+        html.Thead(html.Tr([html.Th(label, scope="col") for label in
+                           ["Data track", "Staging rows", "Fact rows", "Difference", "Reconciliation"]])), html.Tbody(rows),
+    ]), className="table-scroll", tabIndex=0, role="region", **{"aria-label": "Warehouse row reconciliation"})
 
 
 def platform_page():
     data = snapshot()
-    perf = pd.DataFrame(data["performance"])
-    chart = figure("SQL logical reads", "Số trang dữ liệu được đọc (log scale)", "Workload")
-    chart.add_bar(y=perf["workload"], x=perf["before_reads"], name="Trước index", orientation="h", marker_color="#b9c7cc")
-    chart.add_bar(y=perf["workload"], x=perf["after_reads"], name="Sau index", orientation="h", marker_color=TEAL)
-    chart.update_layout(barmode="group", xaxis_type="log", height=280)
-    counts = data["counts"]
+    perf, counts = pd.DataFrame(data["performance"]), data["counts"]
+    matched = sum(counts[f"{p}_staging"] == counts[f"{p}_fact"] for p in ("market", "risk"))
+    reductions = 100 * (1 - perf["after_reads"] / perf["before_reads"])
+    chart = figure("SQL logical reads", "Logical reads · log scale", "")
+    for col, name, color in [("before_reads", "Before index", "#c7d2dc"), ("after_reads", "After index", TEAL)]:
+        chart.add_bar(y=perf["workload"], x=perf[col], name=name, orientation="h", marker_color=color,
+                      text=[f"{v:,}" for v in perf[col]], textposition="outside", cliponaxis=False,
+                      hovertemplate="%{y}<br>%{fullData.name}: %{x:,} logical reads<extra></extra>")
+    chart.update_layout(barmode="group", bargap=.48, margin=dict(l=12, r=64, t=50, b=16))
+    chart.update_xaxes(type="log", range=[2, 6.1], tickvals=[100, 1000, 10000, 100000, 1000000], ticktext=["100", "1K", "10K", "100K", "1M"])
+    chart.update_yaxes(autorange="reversed", showgrid=False)
     return [
-        page_header("PLATFORM / ENGINEERING", "Chất lượng nằm sau mỗi biểu đồ", "Đối soát nguồn dữ liệu và kết quả tối ưu SQL Server đã được đo."),
+        page_header("PLATFORM ASSURANCE / ENGINEERING", "Quality you can trace",
+                    "Reconcile warehouse counts and see the measured trade-offs behind faster SQL queries.",
+                    "EVIDENCE WINDOW", "Snapshot + historical benchmark", "SQL benchmark measured 24 Sep 2026"),
         html.Div([
-            metric("Q1 · Giảm logical reads", "98,94%", "317.528 → 3.364 trang", True),
-            metric("Q2 · Giảm logical reads", "98,82%", "317.528 → 3.734 trang"),
-            metric("Chi phí hai index", "924,51 MB", "Đổi thêm storage và chi phí ghi"),
-            metric("Mô hình triển khai", "2 track", "Market & Motor Risk độc lập"),
+            metric("Warehouse observations", number(counts["market_fact"] + counts["risk_fact"]), "Across two independent data tracks", symbol="database", tone="teal"),
+            metric("Row-count reconciliation", f"{matched} / 2", "Staging and fact counts in this snapshot", symbol="check"),
+            metric("Q1 logical reads saved", f"{reductions.iloc[0]:.2f}%", "Historical company / month workload", symbol="risk", tone="teal"),
+            metric("Additional index storage", f"{perf['index_mb'].sum():,.2f} MB", "Two covering indexes · added write cost", symbol="database"),
         ], className="metrics"),
-        html.Section([html.Div([html.H3("Index cải thiện truy vấn đến đâu?"),html.P("Kết quả STATISTICS IO/TIME ngày 24/09/2026 · SQL Server · Warm cache")],className="chart-heading"),dcc.Graph(figure=chart,style={"height":"300px"},config={"displayModeBar":False})],className="chart-card"),
         html.Section([
-            html.H3("Đối soát trong bản chụp hiện tại"),
-            html.Div([html.Strong("SUSEP Market"),html.Span(f"Staging {counts['market_staging']:,} → Fact {counts['market_fact']:,}"),html.Span("Khớp" if counts['market_staging']==counts['market_fact'] else "Cần kiểm tra",className="reconcile-status")],className="reconcile-row"),
-            html.Div([html.Strong("brvehins1 Risk"),html.Span(f"Staging {counts['risk_staging']:,} → Fact {counts['risk_fact']:,}"),html.Span("Khớp" if counts['risk_staging']==counts['risk_fact'] else "Cần kiểm tra",className="reconcile-status")],className="reconcile-row"),
-            html.P("Khớp số dòng là một kiểm tra riêng; log Data Quality đầy đủ nằm trong SQL Server. Hai nguồn được điều phối chung bằng Airflow và không có quan hệ nối từng dòng.",className="caption"),
-        ],className="quality-panel"),
+            html.Div([html.Div([html.H2("Fewer reads, with an explicit storage cost"),
+                               html.P("SQL Server STATISTICS IO · warm cache · measured 24 September 2026")]),
+                      html.Span("HISTORICAL BENCHMARK", className="small-badge")], className="chart-heading"),
+            html.Div([graph(chart=chart), html.Div([
+                html.Div([html.Span(f"Q{i + 1:02d}"), html.Strong(f"{value:.2f}%"),
+                          html.P(f"fewer logical reads · {perf.iloc[i]['workload']}"),
+                          html.Small(f"{perf.iloc[i]['before_reads']:,} → {perf.iloc[i]['after_reads']:,} pages")],
+                         className="benchmark-stat") for i, value in enumerate(reductions)
+            ], className="benchmark-summary")], className="benchmark-layout"),
+            html.Div("Logical reads measure SQL page accesses. These results do not measure end-to-end dashboard speed.", className="chart-footnote"),
+        ], className="chart-card benchmark-card"),
+        html.Section([
+            html.Div([html.Div([html.H2("Both data tracks, reconciled at the source"),
+                               html.P("Current snapshot counts. Each track keeps its own grain and identity.")]),
+                      html.Span("ROW COUNTS", className="small-badge")], className="chart-heading"),
+            reconciliation_table(counts),
+            html.Div("Matching row counts are one check. Full data-quality gate logs remain in SQL Server; this view does not rerun those gates.", className="chart-footnote"),
+        ], className="chart-card quality-panel"),
+        reading_note("How the two tracks fit together",
+                     "Airflow orchestrates the market and motor-risk pipelines independently. "
+                     "There is no proven customer, policy or row-level join between the sources. "
+                     "This dashboard reads a dated aggregate snapshot; it does not query the warehouse on every interaction. "
+                     "The SQL benchmark and model evaluation are historical evidence, not new measurements."),
     ]
 
 
+def navigation_label(symbol, title, subtitle, index):
+    return html.Span([icon(symbol), html.Span([html.Strong(title), html.Small(subtitle)], className="nav-copy"),
+                      html.Span(index, className="nav-number")], className="nav-option")
+
+
 app.layout = html.Div([
-    dcc.Location(id="url"),
+    html.A("Skip to content", href="#page-content", className="skip-link"),
     html.Aside([
-        html.A([html.Span("ii",className="brand-mark"),html.Div([html.Strong("INSURANCE"),html.Span("INTELLIGENCE")])],href="/",className="brand"),
-        html.Div("ANALYTICS WORKSPACE",className="nav-label"),
-        dcc.RadioItems(id="section",value="market",options=[
-            {"label":html.Span([html.Span("01",className="nav-number"),"Thị trường bảo hiểm"]),"value":"market"},
-            {"label":html.Span([html.Span("02",className="nav-number"),"Motor Risk & ML"]),"value":"risk"},
-            {"label":html.Span([html.Span("03",className="nav-number"),"Chất lượng & Hiệu năng"]),"value":"platform"},
-        ],className="nav-items"),
-        html.Div([html.Div("VỀ DỮ LIỆU",className="nav-label"),html.P("Hai nguồn độc lập.\nMột nền tảng phân tích."),html.Small("SUSEP Market · brvehins1\nPersonal data engineering project")],className="sidebar-footer"),
-    ],className="sidebar"),
+        html.A([html.Span(icon("shield"), className="brand-mark"),
+                html.Div([html.Strong("Insurance"), html.Span("INTELLIGENCE")])], href="/", className="brand"),
+        html.Div("ANALYTICS WORKSPACE", className="nav-label"),
+        html.Nav(dcc.RadioItems(id="section", value="market", options=[
+            {"label": navigation_label("grid", "Market overview", "Premiums & claims", "01"), "value": "market"},
+            {"label": navigation_label("risk", "Motor risk & ML", "Patterns & model scores", "02"), "value": "risk"},
+            {"label": navigation_label("database", "Data & performance", "Quality & SQL evidence", "03"), "value": "platform"},
+        ], className="nav-items"), **{"aria-label": "Analytics sections"}),
+        html.Div([
+            html.Div("THE DATA FOUNDATION", className="nav-label"),
+            html.Div([html.Span("A", className="track-letter"), html.Div([html.Strong("SUSEP Market"), html.Small("8.34M market observations")])], className="source-track"),
+            html.Div([html.Span("B", className="track-letter"), html.Div([html.Strong("brvehins1"), html.Small("1.97M risk observations")])], className="source-track"),
+            html.P("Two independent sources.\nOne analytical workspace.", className="sidebar-note"),
+        ], className="sidebar-data"),
+        html.Div([html.Span("PERSONAL PROJECT"), html.P("Insurance Data Platform"), html.Small("Data engineering · Analytics")], className="sidebar-footer"),
+    ], className="sidebar"),
     html.Main([
-        html.Header([html.Span("Insurance Data Platform",className="breadcrumb"),html.Span("DASH / PLOTLY",className="engine-tag")],className="topbar"),
-        html.Div(id="source-meta"),
+        html.Header([html.Div([html.Span("Workspace"), html.Span("/", className="breadcrumb-divider"), html.Strong("Insurance analytics")], className="breadcrumb"),
+                     html.Div(id="source-meta")], className="topbar"),
         html.Div(id="page-content"),
-        html.Footer([html.Span("Insurance Intelligence"),html.Span("Nguồn: SUSEP & brvehins1 · Các track giữ nguyên grain nguồn")]),
-    ],className="workspace"),
-],className="shell")
+        html.Footer([html.Span("Insurance Intelligence"), html.Span("SUSEP & brvehins1 · Independent source populations")]),
+    ], className="workspace"),
+], className="shell")
 
 
-@app.callback(Output("page-content","children"),Output("source-meta","children"),Input("section","value"))
+@app.callback(Output("page-content", "children"), Output("source-meta", "children"), Input("section", "value"))
 def render_page(section):
     try:
-        return {"market":market_page,"risk":risk_page,"platform":platform_page}.get(section,market_page)(),provenance()
+        return {"market": market_page, "risk": risk_page, "platform": platform_page}.get(section, market_page)(), provenance()
     except (OSError, ValueError, KeyError) as exc:
-        return html.Div([html.H1("Cần chuẩn bị bản chụp dữ liệu"),html.P(str(exc)),html.Code("python pipeline/export_dashboard.py")],className="insight-note"),""
+        return html.Div([html.H1("A data snapshot is needed"), html.P(str(exc)), html.Code("python pipeline/manage.py export")], className="scope-note"), ""
 
 
-@app.callback(Output("market-metrics","children"),Output("market-trend","figure"),Output("market-companies","figure"),Output("market-products","figure"),Input("market-state","value"),Input("market-years","value"))
-def update_market(state,years):
-    monthly,companies,products = market_frames(state,years)
-    premium,claims = monthly["premium"].sum(),monthly["claims"].sum()
-    cards = [metric("Tổng phí bảo hiểm",number(premium),"Đơn vị nguồn · Trong phạm vi lọc",True),metric("Tổng bồi thường",number(claims),"Đơn vị nguồn · Trong phạm vi lọc"),metric("Tỷ lệ bồi thường",number(ratio(claims,premium),percent=True),"Tổng claims / tổng premiums"),metric("Quan sát thị trường",number(monthly["observations"].sum()),f"{years[0]}–{years[1]} · {state if state!='ALL' else 'Toàn thị trường'}")]
-    trend = monthly.groupby("month",as_index=False)[["premium","claims"]].sum()
-    plot=figure("Market trend","Tháng","Giá trị (tỷ đơn vị nguồn)")
-    plot.add_scatter(x=trend["month"],y=trend["premium"]/1e9,name="Phí bảo hiểm",line=dict(color=TEAL,width=2.5),fill="tozeroy",fillcolor="rgba(20,125,120,0.07)")
-    plot.add_scatter(x=trend["month"],y=trend["claims"]/1e9,name="Bồi thường",line=dict(color=ORANGE,width=2))
-    plot.update_layout(height=350)
-    ranks=[]
-    for frame,key,title in [(companies,"company","Company ranking"),(products,"product","Product mix")]:
-        names=snapshot()["market"]["company_names" if key=="company" else "product_names"]
-        ranked=frame.groupby(key,as_index=False)["premium"].sum().nlargest(10 if key=="company" else 8,"premium").sort_values("premium")
-        labels=[names.get(str(x),str(x)) for x in ranked[key]]
-        bars=figure(title,"Phí (tỷ đơn vị nguồn)","")
-        bars.add_bar(x=ranked["premium"]/1e9,y=[name if len(name)<=28 else name[:27]+"…" for name in labels],orientation="h",marker_color=TEAL if key=="company" else "#719e9a",customdata=labels,hovertemplate="%{customdata}<br>%{x:,.2f} tỷ<extra></extra>")
-        bars.update_layout(margin=dict(l=0,r=20,t=8,b=35),hovermode="closest")
+@app.callback(Output("market-state", "value"), Output("market-years", "value"), Input("market-reset", "n_clicks"), prevent_initial_call=True)
+def reset_market(clicks):
+    years = table("market", "monthly")["month"].str[:4].astype(int)
+    return "ALL", [int(years.min()), int(years.max())]
+
+
+@app.callback(Output("risk-state", "value"), Input("risk-reset", "n_clicks"), prevent_initial_call=True)
+def reset_risk(clicks):
+    return "ALL"
+
+
+def empty_figure(chart):
+    chart.add_annotation(text="No observations for this selection", x=.5, y=.5, xref="paper", yref="paper", showarrow=False,
+                         font=dict(color=MUTED, size=13))
+    return chart
+
+
+def product_label(value):
+    source = snapshot()["market"]["product_names"].get(str(value), str(value))
+    code = source.split(" - ", 1)[0]
+    return f"{code} · {PRODUCTS.get(code, 'Product line ' + code)}"
+
+
+def ranking_label(label, key):
+    if key == "company":
+        label = label.split("(", 1)[0].strip()
+        for term in ("COMPANHIA DE SEGUROS GERAIS", "COMPANHIA DE SEGUROS", "E PREVIDÊNCIA", "SEGUROS", "SEGURADORA"):
+            label = label.replace(term, "")
+        label = re.sub(r"\s+S[./]?A[.]?\s*$", "", label)
+        label = " ".join(label.split()).strip(" -/")
+        return label if len(label) <= 18 else label[:17].rstrip() + "…"
+    code, name = label.split(" · ", 1)
+    name = name if len(name) <= 19 else name[:18].rstrip() + "…"
+    return f"{code}<br>{name}"
+
+
+@app.callback(Output("market-metrics", "children"), Output("market-trend", "figure"), Output("market-companies", "figure"),
+              Output("market-products", "figure"), Output("market-takeaway", "children"),
+              Input("market-state", "value"), Input("market-years", "value"), Input("market-grain", "value"))
+def update_market(state, years, grain="monthly"):
+    monthly, companies, products = market_frames(state, years)
+    premium, claims = monthly["premium"].sum(), monthly["claims"].sum()
+    claim_ratio, observations = ratio(claims, premium), int(monthly["observations"].sum())
+    cards = [
+        metric("Total premiums", number(premium), "Source units · selected period", symbol="premium", tone="teal", exact=f"{premium:,.2f}"),
+        metric("Total claims", number(claims), "Source units · reported claims", symbol="claims", tone="orange", exact=f"{claims:,.2f}"),
+        metric("Claims / premiums", number(claim_ratio, percent=True), "Ratio of totals within your selection", symbol="percent"),
+        metric("Market observations", number(observations), f"{years[0]}–{years[1]} · {state if state != 'ALL' else 'All states'}", exact=f"{observations:,}"),
+    ]
+    trend = monthly.assign(period=monthly["month"].str[:4] if grain == "annual" else monthly["month"])
+    trend = trend.groupby("period", as_index=False)[["premium", "claims"]].sum()
+    annual = grain == "annual"
+    plot = figure("Market trend " + grain, "Year" if annual else "Month", "Billions · source units")
+    for column, name, color in [("premium", "Premiums", TEAL), ("claims", "Claims", ORANGE)]:
+        plot.add_scatter(x=trend["period"], y=trend[column] / 1e9, name=name, mode="lines+markers" if annual else "lines",
+                         line=dict(color=color, width=2.6), marker=dict(size=5), fill="tozeroy" if column == "premium" else None,
+                         fillcolor="rgba(8,127,140,0.055)", hovertemplate=f"{name}: %{{y:,.2f}}B source units<extra></extra>")
+    plot.update_layout(showlegend=False)
+    plot.update_xaxes(type="category", nticks=8) if annual else plot.update_xaxes(type="date", tickformat="%Y", nticks=8)
+    if monthly.empty:
+        empty_figure(plot)
+    ranks = []
+    for frame, key, limit in [(companies, "company", 10), (products, "product", 8)]:
+        ranked = frame.groupby(key, as_index=False)["premium"].sum().nlargest(limit, "premium").sort_values("premium")
+        labels = [snapshot()["market"]["company_names"].get(str(v), str(v)) if key == "company" else product_label(v) for v in ranked[key]]
+        short = [ranking_label(label, key) for label in labels]
+        bars = figure("Ranking " + key, "", "")
+        # Technical IDs keep distinct bars when abbreviated source labels coincide.
+        bars.add_bar(x=ranked["premium"] / 1e9, y=ranked[key].astype(str), orientation="h",
+                     marker_color=[TEAL if i == len(ranked) - 1 else "#abcbd0" for i in range(len(ranked))], customdata=labels,
+                     text=[f"{v / 1e9:,.1f}" for v in ranked["premium"]], textposition="outside", cliponaxis=False,
+                     hovertemplate="%{customdata}<br>Premiums: %{x:,.2f}B source units<extra></extra>")
+        bars.update_yaxes(type="category", tickvals=ranked[key].astype(str), ticktext=short, showgrid=False)
+        bars.update_xaxes(showgrid=True, gridcolor="#eef2f5", nticks=4, rangemode="tozero")
+        bars.update_layout(margin=dict(l=8, r=48, t=10, b=12), hovermode="closest", bargap=.36)
+        if ranked.empty:
+            empty_figure(bars)
         ranks.append(bars)
-    return cards,plot,*ranks
+    headline = (f"Claims account for {number(claim_ratio, percent=True)} of premium volume" if claim_ratio is not None
+                else "Premiums and claims within your selection")
+    return cards, plot, *ranks, headline if observations else "No market observations match this selection"
 
 
-@app.callback(Output("risk-metrics","children"),Output("risk-distribution","figure"),Output("risk-observed","figure"),Output("risk-age","figure"),Output("risk-gender","figure"),Input("risk-state","value"))
+@app.callback(Output("risk-metrics", "children"), Output("risk-distribution", "figure"), Output("risk-observed", "figure"),
+              Output("risk-age", "figure"), Output("risk-gender", "figure"), Output("risk-takeaway", "children"), Input("risk-state", "value"))
 def update_risk(state):
-    segments,scores = risk_frames(state)
-    population=scores["observations"].sum()
-    cards=[metric("Quan sát rủi ro",number(segments["observations"].sum()),"Toàn bộ risk DWH đã lọc",True),metric("Tổng exposure",number(segments["exposure"].sum()),"Exposure theo đơn vị nguồn"),metric("Claim / exposure",number(ratio(segments["claim_count"].sum(),segments["exposure"].sum())),"Tổng số claim chia tổng exposure"),metric("Điểm mô hình TB",f"{scores['score_sum'].sum()/population:.3f}" if population else "—",f"Chỉ {population:,} quan sát held-out")]
+    segments, scores = risk_frames(state)
+    population, observations = int(scores["observations"].sum()), int(segments["observations"].sum())
+    cards = [
+        metric("Risk observations", number(observations), "Full filtered risk warehouse", tone="teal", exact=f"{observations:,}"),
+        metric("Total exposure", number(segments["exposure"].sum()), "Exposure in source units", symbol="shield"),
+        metric("Claims / exposure", number(ratio(segments["claim_count"].sum(), segments["exposure"].sum())), "Claim count divided by total exposure", symbol="percent"),
+        metric("Mean model score", f"{scores['score_sum'].sum() / population:.3f}" if population else "—", f"{population:,} filtered held-out observations", symbol="risk", tone="teal"),
+    ]
     scores = scores.assign(band=scores["band"].clip(upper=19))
-    bands=scores.groupby("band",as_index=False)[["observations","score_sum","positives"]].sum()
-    x=(bands["band"]+0.5)/20
-    distribution=figure("Score distribution","Điểm mô hình (0–1)","Số quan sát held-out")
-    distribution.add_bar(x=x,y=bands["observations"],width=.04,marker_color=TEAL,name="Quan sát")
-    distribution.update_xaxes(range=[0,1])
-    observed=figure("Observed claim share","Dải điểm mô hình (0–1)","Quan sát có claim (%)")
-    observed.add_scatter(x=x,y=100*bands["positives"]/bands["observations"],mode="lines+markers",name="HasClaim quan sát",line=dict(color=ORANGE,width=2))
-    observed.update_xaxes(range=[0,1])
-    age=segments.groupby("age",as_index=False)[["observations","has_claim"]].sum().sort_values("age")
-    age_plot=figure("Driver age","Nhóm tuổi nguồn","Quan sát có claim (%)")
-    age_plot.add_bar(x=age["age"],y=100*age["has_claim"]/age["observations"],marker_color=TEAL)
-    gender=segments.groupby("gender",as_index=False)["observations"].sum().sort_values("observations")
-    gender_plot=figure("Profile labels","Số quan sát","Nhãn Gender nguồn")
-    gender_plot.add_bar(x=gender["observations"],y=gender["gender"],orientation="h",marker_color="#719e9a")
-    return cards,distribution,observed,age_plot,gender_plot
+    bands = scores.groupby("band", as_index=False)[["observations", "score_sum", "positives"]].sum()
+    x = (bands["band"] + .5) / 20
+    distribution = figure("Score distribution", "Model score", "Held-out observations")
+    distribution.add_bar(x=x, y=bands["observations"], width=.038, marker_color=[TEAL if b < 4 else "#abcbd0" for b in bands["band"]],
+                         customdata=list(zip(bands["band"] / 20, (bands["band"] + 1) / 20)),
+                         hovertemplate="Score band: %{customdata[0]:.2f}–%{customdata[1]:.2f}<br>Observations: %{y:,}<extra></extra>")
+    distribution.update_xaxes(range=[0, 1], dtick=.2)
+    observed = figure("Observed claim share", "Model score band", "Share / score (%)")
+    for values, name, color, dash in [
+        (100 * bands["positives"] / bands["observations"], "Observed HasClaim", TEAL, "solid"),
+        (100 * bands["score_sum"] / bands["observations"], "Mean model score", ORANGE, "dash"),
+    ]:
+        observed.add_scatter(x=x, y=values, mode="lines+markers", name=name, customdata=bands["observations"],
+                             line=dict(color=color, width=2.3, dash=dash), marker=dict(size=5),
+                             hovertemplate="%{fullData.name}: %{y:.1f}%<br>Band size: %{customdata:,}<extra></extra>")
+    observed.update_layout(margin=dict(t=50))
+    observed.update_xaxes(range=[0, 1], dtick=.2)
+    observed.update_yaxes(range=[0, 105], ticksuffix="%")
+    age = segments.assign(age=segments["age"].replace({"Không rõ": "Unknown"}))
+    age = age.groupby("age")[["observations", "has_claim"]].sum().reindex(["18-25", "26-35", "36-45", "46-55", ">55", "Unknown"]).dropna().reset_index()
+    shares = 100 * age["has_claim"] / age["observations"]
+    age_plot = figure("Driver age", "Source age group", "Observations with a claim (%)")
+    age_plot.add_bar(x=age["age"], y=shares, marker_color=["#c7d2dc" if a == "Unknown" else TEAL for a in age["age"]],
+                     text=[f"{v:.1f}%" for v in shares], textposition="outside", cliponaxis=False, customdata=age["observations"],
+                     hovertemplate="%{x}<br>HasClaim: %{y:.1f}%<br>Observations: %{customdata:,}<extra></extra>")
+    age_plot.update_yaxes(range=[0, max(10, float(shares.max()) * 1.2)] if not shares.empty else [0, 100])
+    gender = segments.assign(gender=segments["gender"].replace({"Không rõ": "Unknown"}))
+    gender = gender.groupby("gender", as_index=False)["observations"].sum().sort_values("observations")
+    gender_plot = figure("Profile labels", "Observations", "")
+    gender_plot.add_bar(x=gender["observations"], y=gender["gender"], orientation="h",
+                        marker_color=["#c7d2dc" if g == "Unknown" else "#6da7b0" for g in gender["gender"]],
+                        text=[number(v) for v in gender["observations"]], textposition="outside", cliponaxis=False,
+                        hovertemplate="%{y}<br>Observations: %{x:,}<extra></extra>")
+    gender_plot.update_layout(margin=dict(r=65), bargap=.48)
+    gender_plot.update_yaxes(showgrid=False)
+    gender_plot.update_xaxes(showgrid=True, gridcolor="#eef2f5", nticks=4)
+    for chart in (distribution, observed):
+        if not population:
+            empty_figure(chart)
+    for chart in (age_plot, gender_plot):
+        if not observations:
+            empty_figure(chart)
+    below = bands.loc[bands["band"] < 4, "observations"].sum()
+    headline = f"{number(ratio(below, population), percent=True)} of held-out scores fall below 0.20" if population else "No held-out scores match this selection"
+    return cards, distribution, observed, age_plot, gender_plot, headline
 
 
-@app.callback(Output("market-download","data"),Input("market-export","n_clicks"),State("market-state","value"),State("market-years","value"),prevent_initial_call=True)
-def download_market(clicks,state,years):
-    return dcc.send_data_frame(market_frames(state,years)[0].to_csv,"market-summary.csv",index=False) if clicks else no_update
+@app.callback(Output("market-download", "data"), Input("market-export", "n_clicks"), State("market-state", "value"), State("market-years", "value"), prevent_initial_call=True)
+def download_market(clicks, state, years):
+    return dcc.send_data_frame(market_frames(state, years)[0].to_csv, "market-summary.csv", index=False) if clicks else no_update
 
 
-@app.callback(Output("risk-download","data"),Input("risk-export","n_clicks"),State("risk-state","value"),prevent_initial_call=True)
-def download_risk(clicks,state):
-    return dcc.send_data_frame(risk_frames(state)[0].to_csv,"risk-summary.csv",index=False) if clicks else no_update
+@app.callback(Output("risk-download", "data"), Input("risk-export", "n_clicks"), State("risk-state", "value"), prevent_initial_call=True)
+def download_risk(clicks, state):
+    if not clicks:
+        return no_update
+    return dcc.send_data_frame(risk_frames(state)[0].replace({"Không rõ": "Unknown"}).to_csv, "risk-summary.csv", index=False)
 
 
 @server.get("/healthz")
 def health():
     try:
-        data=snapshot()
-        return {"status":"ok","data_mode":"warehouse_snapshot","exported_at_utc":data["exported_at_utc"]}
-    except (OSError,ValueError,KeyError):
-        return {"status":"data_unavailable"},503
+        data = snapshot()
+        return {"status": "ok", "data_mode": "warehouse_snapshot", "exported_at_utc": data["exported_at_utc"]}
+    except (OSError, ValueError, KeyError):
+        return {"status": "data_unavailable"}, 503
 
 
 if __name__ == "__main__":
-    app.run(host=os.getenv("DASH_HOST","127.0.0.1"),port=int(os.getenv("DASH_PORT","8050")),debug=False)
+    app.run(host=os.getenv("DASH_HOST", "127.0.0.1"), port=int(os.getenv("DASH_PORT", "8050")), debug=False)

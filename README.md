@@ -72,14 +72,14 @@ The [snapshot exporter](pipeline/export_dash.py) reads the aggregate tables in o
 
 - **Query tuning:** [benchmark SQL](database/performance.sql) and two covering indexes support the measured SUSEP workloads. The **24 September 2026** benchmark recorded **98.94% / 98.82% fewer logical reads**, with **924.51 MB** of added index storage and write overhead. These are historical, workload-specific measurements.
 - **Repeatable local services:** [Docker Compose](docker-compose.yml) defines SQL Server, Dash, and Airflow profiles; [Dockerfiles](infra) and pinned dependencies describe their environments. Database, Airflow metadata, and task logs use persistent named volumes.
-- **Validation:** [static validation](pipeline/validate.py), [unit tests](tests/test_platform.py), and [browser checks](tests/browser_check.py) cover the maintained layout, aggregate integrity, migration ordering, filters, exports, and responsive views. Tests also reconcile score-bin counts and observed outcomes, check filtered reference rates, and verify that SQL bars start at zero. Automated CI and an isolated fresh database rebuild/restore are still planned.
+- **Validation:** [static validation](pipeline/validate.py), [unit tests](tests/test_platform.py), and [browser checks](tests/browser_check.py) cover the maintained layout, aggregate integrity, migration ordering, filters, exports, and responsive views. Tests also reconcile score-bin counts and observed outcomes, check filtered reference rates, and verify the recorded before/after SQL read counts. Automated CI and an isolated fresh database rebuild/restore are still planned.
 - **Scope of change capture:** [the CDC demonstration](pipeline/cdc_demo.py) is an isolated controlled example. The two real source pipelines currently ingest immutable CSV batches; they do not capture live operational changes.
 
 ## Dashboard stories
 
 These are **individual views from the English-language Dash app**, captured from the SQL export dated **11 November 2026**. They show the unfiltered default view. Choose a state or year range in the app to ask a narrower question; the screenshot findings below describe only the displayed population. The dashboard is a snapshot, not a live SQL view. For a page-by-page narrative in Vietnamese, read [the dashboard story guide](dashboard/STORY.md).
 
-The [visualization guide and chart audit](docs/VISUALIZATION_GUIDE.md) trace the design to seven course PDFs: chart purpose, honest axes, continuous score bins, color meaning, and a connected narrative. Source-backed theory, inferred applications, and implementation choices are labeled separately. The Motor risk page first shows the full warehouse population, then a visibly separate held-out evaluation; filter controls update each within its own scope.
+The [visualization guide and chart audit](dashboard/VISUALIZATION_GUIDE.md) trace the design to seven course PDFs: chart purpose, honest axes, continuous score bins, color meaning, and a connected narrative. Source-backed theory, inferred applications, and implementation choices are labeled separately. The Motor risk page first shows the full warehouse population, then a visibly separate held-out evaluation; filter controls update each within its own scope.
 
 ### Market overview · Track A
 
@@ -87,7 +87,7 @@ The [visualization guide and chart audit](docs/VISUALIZATION_GUIDE.md) trace the
 
 <p align="center"><img src="dashboard/assets/market-trend.png" alt="Monthly SUSEP premiums and claims from 2003 to July 2023" width="100%"></p>
 
-**Insight:** Premium volume rises over much of the series while claims remain below premiums. Across the full selected period, premiums total **3.05 trillion** and claims **735.52 billion** in *source units*, giving a **24.1% claims-to-premiums ratio**. The latest comparable period, January–July 2023 versus January–July 2022, has **8.9% higher premiums** and a **4.9 percentage-point lower ratio**. The chart can switch between monthly and annual aggregation; 2023 contains only January–July, so its annual point is a partial year. This ratio is a descriptive aggregate, not a profit margin.
+**Insight:** Premium volume rises over much of the series while claims remain below premiums. Across the full selected period, premiums total **3.05 trillion** and claims **735.52 billion** in *source units*, giving a **24.1% claims-to-premiums ratio**. The latest comparable period, January–July 2023 versus January–July 2022, has **8.9% higher premiums** and a **4.9 percentage-point lower ratio**. The green up arrow and red down arrow on the KPI badges show numerical direction, not a verdict on business performance. The chart can switch between monthly and annual aggregation; 2023 contains only January–July, so its annual point is a partial year. This ratio is a descriptive aggregate, not a profit margin.
 
 #### Which companies account for the most premium volume?
 
@@ -125,13 +125,13 @@ The [visualization guide and chart audit](docs/VISUALIZATION_GUIDE.md) trace the
 
 #### What did the SQL indexes improve, and what did they cost?
 
-<p align="center"><img src="dashboard/assets/sql-benchmark.png" alt="Before and after SQL logical reads for two SUSEP workloads on a linear axis starting at zero" width="100%"></p>
+<p align="center"><img src="dashboard/assets/sql-benchmark.png" alt="Two SQL query comparisons showing exact page reads before and after indexing and percentage reduction" width="100%"></p>
 
 **Insight:** In a **24 September 2026** warm-cache benchmark, two covering indexes reduced logical reads by **98.94%** for the company/month workload and **98.82%** for the state/product/month workload. They also added approximately **924.51 MB** of index storage and write overhead. Logical reads measure SQL page accesses; this is historical evidence for those two queries, not a new benchmark or an end-to-end dashboard speed test. The Data tab's KPI also shows staging/fact row-count reconciliation from the current snapshot.
 
-The benchmark uses a **linear zero baseline**: 317,528 → 3,364 reads for Q1, and 317,528 → 3,734 for Q2. Small after-index bars reflect the actual scale of the reduction; exact labels and workload descriptions keep them readable. Across the app, premiums use navy, observed claims use terracotta, model scores use purple, and observation counts use gray. These are metric identities; favorable/adverse status is reserved for explained comparisons.
+The comparison shows the exact before and after counts: **317,528 → 3,364** page reads for the company/month query, and **317,528 → 3,734** for the state/product/month query. It pairs each reduction with its query name and keeps the **924.51 MB** storage trade-off visible. Across the app, premiums use navy, observed claims use terracotta, model scores use purple, and observation counts use gray. KPI arrows and badge colors indicate increase or decrease only.
 
-The app also includes age-group and profile-label views, per-track filters and resets, CSV exports of **filtered aggregates**, and Plotly PNG chart downloads. Market KPI comparison badges use matching calendar months in the prior year and can show favorable or unfavorable movement. The risk tab separates full-warehouse observations from the 20,000-row held-out model sample.
+The app also includes age-group and profile-label views, per-track filters and resets, CSV exports of **filtered aggregates**, and Plotly PNG chart downloads. Market KPI comparison badges use matching calendar months in the prior year. The risk tab separates full-warehouse observations from the 20,000-row held-out model sample.
 
 ## Quick start
 
@@ -215,13 +215,12 @@ Compose requires `SQLSERVER_SA_PASSWORD` in `.env` for configuration interpolati
 ## Repository layout and storage
 
 ```text
-dashboard/   Dash app, styling, technology diagram, chart images, and STORY.md
+dashboard/   Dash app, styling, chart images, STORY.md, and visualization guide
 pipeline/    Ingestion, validation, quality operations, ML, export, Airflow DAG, CLI
 database/    Versioned SQL migrations V1–V14 and benchmark SQL
 infra/       Dockerfiles and service-specific dependencies
 data/        Public aggregate snapshot and evidence; private raw/model/output locally
 tests/       Unit and browser checks
-docs/        Source-referenced visualization principles and chart audit
 ```
 
 `docker-compose.yml` stays at the root as the system entry point. `database/` holds **SQL code** that creates and upgrades the database; `data/` holds **files** used or produced by the project. SQL Server's actual database files live in the Docker named volume `sqlserver_data` at `/var/opt/mssql`, not in either repository folder. `airflow_state` holds local Airflow metadata and `airflow_logs` holds task logs. Raw and model folders are mounted read-only into containers that need them.

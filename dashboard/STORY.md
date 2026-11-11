@@ -2,7 +2,7 @@
 
 Tài liệu này giải thích **ba trang của ứng dụng Plotly Dash** theo cách có thể trình bày khi vấn đáp. Giao diện viết bằng tiếng Anh; tài liệu này viết bằng tiếng Việt để dễ học. Các con số ví dụ lấy từ snapshot SQL xuất ngày **11/11/2026** (`data/dashboard.json`), ở bộ lọc mặc định **All states** và toàn bộ khoảng thời gian. Đổi bộ lọc thì phải đọc lại số trên giao diện. Dashboard không truy vấn SQL trực tiếp mỗi khi tương tác.
 
-Cơ sở lựa chọn biểu đồ, dẫn trang PDF, audit và các quyết định giữ/sửa nằm trong [VISUALIZATION_GUIDE](../docs/VISUALIZATION_GUIDE.md). Tài liệu này tập trung vào cách đọc dữ liệu và kể câu chuyện; không thay thế phần lý thuyết đó.
+Cơ sở lựa chọn biểu đồ, dẫn trang PDF, audit và các quyết định giữ/sửa nằm trong [VISUALIZATION_GUIDE](VISUALIZATION_GUIDE.md). Tài liệu này tập trung vào cách đọc dữ liệu và kể câu chuyện; không thay thế phần lý thuyết đó.
 
 ## Câu chuyện chung: dữ liệu có nguồn gốc → hiểu hiện tượng → kiểm giới hạn
 
@@ -24,7 +24,7 @@ Hai nguồn **không có khóa join theo từng bản ghi**. Vì vậy ba trang 
 - `Total claims`: tổng claims báo cáo, khoảng **735,52 tỷ**. Đây là số tiền tổng hợp của nguồn, không phải số claim event.
 - `Claims / premiums`: lấy **tổng claims chia tổng premiums** khi mẫu số dương; mặc định **24,1%**. Không phải lợi nhuận hay loss ratio được chuẩn hóa theo mọi loại sản phẩm.
 - `Market observations`: **8.338.214** dòng fact ở bộ lọc mặc định. Một dòng là công ty × tháng × sản phẩm × bang.
-- Badge biến động so **cùng các tháng của năm cuối được chọn với năm trước**, cùng bang. Với 2023, chỉ so tháng 01–07 với 01–07/2022: premium **+8,9%**, tỷ lệ claims/premiums **−4,9 điểm phần trăm**. Màu badge chỉ diễn đạt chiều biến động, không chứng minh đạt KPI kinh doanh.
+- Badge biến động so **cùng các tháng của năm cuối được chọn với năm trước**, cùng bang. Với 2023, chỉ so tháng 01–07 với 01–07/2022: premium **▲ +8,9%** màu xanh, tỷ lệ claims/premiums **▼ −4,9 điểm phần trăm** màu đỏ. Màu và tam giác chỉ diễn đạt **chiều tăng/giảm**, không chứng minh tốt/xấu về kinh doanh.
 
 ### Biểu đồ “Premiums and claims, in perspective”
 
@@ -109,7 +109,7 @@ Hover hiện biên khoảng, số observation và số HasClaim thật. Nếu m�
 
 - `Warehouse observations`: tổng số dòng fact của **hai track độc lập**, khoảng **10,30 triệu**. Đây chỉ là tổng quy mô; không có phép join giữa chúng.
 - `Row-count reconciliation`: **2/2** track có số dòng staging bằng fact trong snapshot. Khớp số dòng là một kiểm tra, **không thay thế** toàn bộ SQL quality gate.
-- `Q1 logical reads saved`: **98,94%** ít page reads hơn cho workload công ty/tháng trong benchmark lịch sử.
+- `Company query reads saved`: **98,94%** ít page reads hơn cho workload công ty/tháng trong benchmark lịch sử.
 - `Additional index storage`: khoảng **924,51 MB** cho hai covering indexes, kèm chi phí ghi/bảo trì index.
 
 ### Bảng “Inspect the data behind the charts”
@@ -118,13 +118,13 @@ Hover hiện biên khoảng, số observation và số HasClaim thật. Nếu m�
 
 **Cách dùng để kiểm:** chọn một bang, nhìn các hàng tháng/nhóm; sau đó quay lại trang Market hoặc Motor và đặt cùng bang để đối chiếu xu hướng hoặc nhóm quan sát. Bảng Market theo tháng/bang không có chiều công ty/sản phẩm, nên không thể dùng nó để kiểm từng cột ranking. Bảng Motor theo state/Gender/age không có score band; score được tổng hợp riêng trong snapshot.
 
-### Biểu đồ “Fewer reads, with an explicit storage cost”
+### So sánh “What did the indexes change?”
 
-**Trả lời:** Hai covering indexes làm thay đổi số logical reads của hai workload SUSEP đã đo như thế nào? Trục ngang dùng **thang tuyến tính bắt đầu từ 0**, thanh xám là trước index, thanh teal là sau index. Q1 là company/month; Q2 là state/product/month, có tên đầy đủ ở phần số liệu bên cạnh và hover.
+**Trả lời:** Hai covering indexes làm thay đổi số logical reads của hai câu truy vấn SUSEP đã đo như thế nào? Mỗi thẻ ghi **tên câu truy vấn → số page reads trước index → số sau index → phần trăm giảm**. “Logical read” là một lượt SQL Server đọc trang dữ liệu; 317.528 lần đọc không có nghĩa truy vấn mất 317.528 giây.
 
 **Insight lịch sử:** workload công ty/tháng từ **317.528 → 3.364** logical reads (**−98,94%**); state/sản phẩm/tháng từ **317.528 → 3.734** (**−98,82%**). Đổi lại khoảng **924,51 MB** index và thêm chi phí ghi. Đó không phải lời hứa mọi truy vấn nhanh hơn 99%, cũng không đo tốc độ end-to-end của dashboard (Dash đọc JSON snapshot, không gọi SQL khi đổi filter).
 
-Thanh sau index rất ngắn là **đúng độ lớn**, không phải lỗi hiển thị. Nhãn exact giúp đọc số nhỏ. Không kéo dài thanh bằng log axis, vì người xem bar thường so chiều dài từ gốc; lựa chọn này bám nguyên tắc bar từ 0 ở C2 p35. Không dùng % giảm logical reads để nói elapsed time cũng giảm cùng mức.
+Biểu đồ thanh cũ khiến hai cột “sau index” gần như biến mất do chênh lệch gần 100%, còn nhãn Q1/Q2 buộc người xem tra tên ở chỗ khác. Thẻ so sánh cho đọc trực tiếp bốn thông tin cần thiết và vẫn trình bày **chi phí lưu index** bên dưới. Không dùng % giảm logical reads để nói elapsed time cũng giảm cùng mức.
 
 **Câu kết cho trang:** “Tôi cho xem các aggregate thật thay vì chỉ số tổng, giữ mốc xuất dữ liệu để truy vết, và trình bày cả lợi ích đọc SQL lẫn chi phí lưu/ghi của index. Đối soát số dòng cho biết tính đầy đủ ở một mức; quality gates SQL mới kiểm sâu hơn.”
 

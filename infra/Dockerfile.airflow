@@ -8,5 +8,8 @@ RUN apt-get update \
     && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
     && rm -rf /var/lib/apt/lists/*
 USER airflow
-COPY airflow/requirements.txt /tmp/airflow-ml-requirements.txt
+COPY infra/requirements-airflow.txt /tmp/airflow-ml-requirements.txt
 RUN pip install --no-cache-dir --retries 10 --timeout 120 -r /tmp/airflow-ml-requirements.txt
+USER root
+RUN mkdir -p /opt/airflow/state && chown airflow:root /opt/airflow/state
+USER airflow

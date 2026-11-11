@@ -1,80 +1,27 @@
-# Data files
-data/raw/*
-!data/raw/.gitkeep
-
-# Credentials and environment variables
+# Local secrets and Python environments
 .env
-*.env
-*.pem
-*.key
-credentials.json
-secrets/
-
-# Python
+.env.*
+!.env.example
+.venv/
+venv/
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
-.Python
-env/
-venv/
-.venv/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
-*.egg-info/
-.installed.cfg
-*.egg
-
-# Runtime ML artifacts are reproducible locally but binary outputs do not belong in Git.
-ml/artifacts/*
-!ml/artifacts/.gitkeep
-
-# Local orchestration/runtime output; keep checkpoints and reports, exclude live logs.
-log/scheduler/
-log/dag_processor_manager/
-log/dag_id=*/
-reports/data/*.log
-
-.cursor/*
-!.cursor/rules/
-!.cursor/rules/**
-
-# Jupyter Notebooks
-.ipynb_checkpoints
-*/.ipynb_checkpoints/*
-
-# Airflow
-logs/
-airflow.cfg
-airflow.db
-unittests.cfg
+.pytest_cache/
+.coverage
+htmlcov/
+# Immutable source, trained binaries, regenerated results
+data/raw/*
+!data/raw/.gitkeep
+data/models/*
+!data/models/.gitkeep
+data/generated/*
+!data/generated/.gitkeep
+# Temporary runtime output and local editor settings
+.tmp-*
 *.log
-
-# Operating System Files
+*.pending
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db
 Desktop.ini
-
-
-# Personal
-roadmap.md
-!docs/specs/roadmap.md
-
-# Personal agent-session history; intentionally local only.
-AGENT_PROMPT_HISTORY.md
-.tmp-dependency-check-*/
-
-# Local project guides and environment template.
-FINAL_PROJECT_GUIDE.md
-REPO_LEARNING_GUIDE.md
-.env.example

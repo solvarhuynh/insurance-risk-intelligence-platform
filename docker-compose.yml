@@ -6,21 +6,36 @@ services:
     environment:
       ACCEPT_EULA: "Y"
       MSSQL_PID: Developer
-      # Required for the isolated P1-INC-02 CDC engineering demonstration.
-      # CDC remains disabled until the versioned demo migration is applied.
       MSSQL_AGENT_ENABLED: "true"
-      MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?Set SQLSERVER_SA_PASSWORD in the ignored .env file or process environment.}
+      MSSQL_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?Set SQLSERVER_SA_PASSWORD in .env}
     ports:
-      - "1433:1433"
+      - "127.0.0.1:1433:1433"
     volumes:
       - sqlserver_data:/var/opt/mssql
       - ./data/raw:/var/opt/mssql/raw_data:ro
-
+  dashboard:
+    profiles: ["analytics"]
+    build:
+      context: .
+      dockerfile: infra/Dockerfile.dashboard
+    container_name: insurance_dashboard
+    restart: unless-stopped
+    environment:
+      DASHBOARD_DATA_PATH: /app/data/dashboard.json
+    ports:
+      - "127.0.0.1:8050:8050"
+    volumes:
+      - ./data:/app/data:ro
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8050/healthz')"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
   airflow:
     profiles: ["orchestration"]
     build:
       context: .
-      dockerfile: airflow/Dockerfile
+      dockerfile: infra/Dockerfile.airflow
     container_name: insurance_airflow
     restart: unless-stopped
     depends_on:
@@ -28,22 +43,26 @@ services:
     environment:
       AIRFLOW__CORE__LOAD_EXAMPLES: "False"
       AIRFLOW__CORE__EXECUTOR: SequentialExecutor
-      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/airflow.db
-      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-configure-before-orchestration-runtime}
-      SQLSERVER_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?Set SQLSERVER_SA_PASSWORD in the ignored .env file or process environment.}
+      AIRFLOW__CORE__DAGS_FOLDER: /opt/airflow/project/pipeline
+      AIRFLOW__DATABASE__SQL_ALCHEMY_CONN: sqlite:////opt/airflow/state/airflow.db
+      AIRFLOW__WEBSERVER__SECRET_KEY: ${AIRFLOW_SECRET_KEY:-local-development-change-before-sharing}
+      SQLSERVER_SA_PASSWORD: ${SQLSERVER_SA_PASSWORD:?Set SQLSERVER_SA_PASSWORD in .env}
       SQLSERVER_HOST: sqlserver,1433
+      PYTHONPATH: /opt/airflow/project/pipeline
     ports:
-      - "8080:8080"
+      - "127.0.0.1:8080:8080"
     volumes:
-      - ./dags:/opt/airflow/dags
-      - ./sql:/opt/airflow/sql
-      - ./log:/opt/airflow/logs
-      - ./data/raw:/opt/airflow/raw_data:ro
-      - ./scripts:/opt/airflow/project/scripts:ro
-      - ./ml:/opt/airflow/project/ml:ro
-      - ./reports:/opt/airflow/project/reports
+      - ./pipeline:/opt/airflow/project/pipeline:ro
+      - ./data/raw:/opt/airflow/project/data/raw:ro
+      - ./data/models:/opt/airflow/project/data/models:ro
+      - ./data/generated:/opt/airflow/project/data/generated
+      - airflow_state:/opt/airflow/state
+      - airflow_logs:/opt/airflow/logs
     command: standalone
-
 volumes:
   sqlserver_data:
+    driver: local
+  airflow_state:
+    driver: local
+  airflow_logs:
     driver: local

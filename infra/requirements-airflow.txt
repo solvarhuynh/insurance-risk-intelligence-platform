@@ -5,3 +5,4 @@ pyodbc==5.3.0
 # Must match the declared repository venv so the Track-B joblib artifact reloads.
 scikit-learn==1.7.2
 joblib==1.5.2
+python-dotenv==1.1.1

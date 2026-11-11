@@ -1,4 +1,6 @@
-<p align="center"><img src="dashboard/assets/banner.svg" alt="Insurance Data Platform — personal data engineering project" width="100%"></p>
+<p align="center">
+  <img src="dashboard/assets/banner.svg" alt="Insurance Data Platform — Python, SQL Server, Airflow, Docker và phân tích rủi ro" width="100%">
+</p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
@@ -8,35 +10,59 @@
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&amp;logo=docker&amp;logoColor=white" alt="Docker Compose">
 </p>
 
-<p align="center"><b>Kho dữ liệu bảo hiểm, kiểm soát chất lượng và phân tích rủi ro — từ CSV đến dashboard web.</b></p>
-<p align="center"><a href="#chạy-nhanh">Chạy nhanh</a> · <a href="GUIDE.md">Học và vận hành</a> · <a href="CHANGELOG.md">Bằng chứng & lịch sử</a> · <a href="AGENTS.md">Bàn giao AI</a></p>
+<p align="center"><strong>Từ CSV bảo hiểm đến kho dữ liệu có kiểm soát chất lượng, mô hình rủi ro và dashboard tương tác.</strong></p>
 
-## Dự án này làm gì?
+<p align="center">
+  <a href="#dashboard"><strong>↗ Xem dashboard</strong></a>
+  &nbsp;&nbsp;·&nbsp;&nbsp;
+  <a href="#architecture"><strong>◇ Xem sơ đồ dự án</strong></a>
+</p>
 
-Đây là **dự án cá nhân về Data Engineering**: nạp hơn 10,3 triệu quan sát bảo hiểm vào SQL Server, xây star schema và quality gates, điều phối bằng Airflow, triển khai mô hình HasClaim có giới hạn tài nguyên và trình bày bằng **Plotly Dash**. Dự án tập trung vào pipeline có thể chạy lại, dữ liệu có thể đối soát và quyết định kỹ thuật có bằng chứng.
+> **Liên kết dashboard công khai:** đang chờ triển khai. Nút trên dẫn tới ảnh xem trước và cách chạy local; sau khi có URL Vercel, thay `href="#dashboard"` bằng URL thật. Ứng dụng Dash hiện chạy bằng Python/Gunicorn; triển khai Vercel cần kiểm tra runtime và chức năng export, chưa được xác nhận trong repo này.
 
-Hai nhánh phân tích giữ riêng ý nghĩa nguồn:
+## Tổng quan
 
-- **Track A — SUSEP Market:** 8.338.214 dòng theo công ty/tháng/sản phẩm/bang, phục vụ phí bảo hiểm, bồi thường và tối ưu truy vấn. Dữ liệu 01/2003–07/2023.
-- **Track B — brvehins1 Motor Risk:** 1.965.355 quan sát tổng hợp, phục vụ risk analytics và ML. Mô hình chấm 20.000 dòng held-out; ROC-AUC 0,809 và Average Precision 0,514 trên test lịch sử.
+**Insurance Data Platform** là dự án cá nhân về data engineering và analytics. Python nạp dữ liệu theo batch; SQL Server giữ staging, star schema, kiểm tra chất lượng và prediction; Airflow điều phối; Plotly Dash đọc một snapshot aggregate có ghi thời điểm xuất. Dashboard không truy vấn hàng triệu dòng mỗi lần đổi bộ lọc.
 
-Hai nguồn không có khóa khách hàng/hợp đồng chung; nền tảng giữ hai star schema độc lập. Prudential là hướng dự kiến chưa có dữ liệu. Contract và cách diễn giải đúng nằm trong [GUIDE](GUIDE.md#6-hợp-đồng-nguồn-và-từ-điển-dữ-liệu).
+- **Track A · SUSEP Market:** 8.338.214 dòng theo *công ty × tháng × sản phẩm × bang*, giai đoạn 01/2003–07/2023. Phục vụ phân tích premium, claims, loss ratio và hiệu năng truy vấn.
+- **Track B · brvehins1 Motor Risk:** 1.965.355 quan sát rủi ro tổng hợp trong năm CSV. Phục vụ phân tích exposure, claim frequency và mô hình liên hệ với `HasClaim`.
 
+Hai nguồn có **grain và danh tính khác nhau**. Không có khóa chung được chứng minh để join từng dòng; dự án giữ hai nhánh warehouse độc lập. Prudential là hướng tương lai, **chưa có raw data hoặc pipeline**.
+
+<a id="architecture"></a>
+## Sơ đồ kiến trúc
+
+<p align="center">
+  <img src="dashboard/assets/architecture.svg" alt="Hai luồng độc lập SUSEP Market và brvehins1 Motor Risk đi từ CSV qua Python, SQL Server và quality gate; aggregate JSON cấp dữ liệu cho Plotly Dash; Airflow điều phối" width="100%">
+</p>
+
+**Đọc sơ đồ từ trái sang phải:** CSV gốc → Python ingest → SQL staging/star schema → quality gate → aggregate hoặc scoring → snapshot JSON → Dash. Airflow chạy thứ tự công việc, Docker Compose chạy các dịch vụ local. Đường nối ở cuối chỉ gom **kết quả tổng hợp** cho giao diện, không phải join hai nguồn ở mức bản ghi.
+
+### Các lớp dữ liệu
+
+1. **Nguồn và nạp dữ liệu:** `pipeline/load_market.py` và `load_risk.py` đọc CSV theo batch, kiểm header/kiểu và giữ lineage (`SourceFile`, số dòng, hash, batch). Raw chỉ đọc và không nằm trong Git.
+2. **SQL Server:** schema `stg` giữ dữ liệu nạp; `dwh` giữ dimension/fact của hai track; `meta` ghi version và batch; `dq` chạy quality gate. File SQL trong repo tạo schema, còn **database thật nằm trong Docker volume**.
+3. **Phân tích:** Track A đối soát raw/staging/fact và tính aggregate thị trường. Track B có bảng prediction cho 20.000 dòng held-out; model binary nằm local, không được tự train khi mở dashboard.
+4. **Phục vụ giao diện:** `pipeline/export_dash.py` xuất các bảng aggregate vào `data/dashboard.json`. Dash lọc và vẽ từ snapshot này; muốn thấy dữ liệu SQL mới phải chạy `export` rồi tải lại trang.
+
+<a id="dashboard"></a>
 ## Dashboard
 
-<img src="dashboard/assets/preview.png" alt="Dashboard Plotly Dash chạy trên dữ liệu tổng hợp thật từ SQL Server" width="100%">
+<p align="center">
+  <img src="dashboard/assets/preview.png" alt="Giao diện Plotly Dash tiếng Anh với ba trang Market, Motor Risk và Data Performance" width="100%">
+</p>
 
-Ba trang phân tích thống nhất, dùng sidebar, KPI và biểu đồ tương tác:
+Giao diện **tiếng Anh**, có bộ lọc riêng cho từng nguồn, KPI giải thích rõ phạm vi, biểu đồ tương tác và bố cục cho desktop/mobile:
 
-- **Thị trường bảo hiểm:** lọc bang/giai đoạn, xu hướng tháng, doanh nghiệp và sản phẩm dẫn đầu, tải aggregate CSV.
-- **Motor Risk & ML:** exposure, claim frequency, phân bố score, kết quả HasClaim theo nhóm và dải điểm; filter riêng của Track B.
-- **Chất lượng & Hiệu năng:** đối soát count staging/fact và bằng chứng tối ưu SQL trước/sau index.
+- **Market overview:** premium, claims, ratio, top company/product; lọc bang và năm; đổi Monthly/Annual; tải CSV aggregate theo bộ lọc.
+- **Motor risk & ML:** exposure, claim frequency, phân bố score và so sánh score với `HasClaim` quan sát. ROC-AUC/AP là số đo lịch sử của toàn bộ held-out, không đổi theo filter.
+- **Data & performance:** bảng đối soát staging/fact và benchmark SQL có ghi ngày đo; biểu đồ nêu cả lợi ích đọc dữ liệu và chi phí lưu index.
 
-Dashboard đọc **snapshot aggregate từ SQL thật** trong [data/dashboard.json](data/dashboard.json), có thời điểm xuất hiển thị rõ trên trang. Chạy demo không cần Power BI, SQL credential hoặc CSV gốc. Muốn làm mới dữ liệu, chạy export sau pipeline rồi tải lại trang. Các metric ML/performance lịch sử được ghi nhãn riêng; dashboard không phải dữ liệu realtime.
+Ảnh trên chụp ứng dụng chạy từ snapshot xuất từ SQL thật vào **11/11/2026**. Dashboard không realtime, không cần credential SQL để xem local. CSV tải xuống là **aggregate đã lọc**, không phải raw CSV hay toàn bộ prediction.
 
-## Chạy nhanh
+### Chạy nhanh từ snapshot đi kèm
 
-Cần Python 3.12. Trong PowerShell tại thư mục repo:
+Cần **Python 3.12**. Mở PowerShell tại root repository:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -44,88 +70,103 @@ py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m dashboard.app
 ```
 
-Mở **[http://127.0.0.1:8050](http://127.0.0.1:8050)**. Nếu đã có `.venv`, dùng lại môi trường hiện hữu.
+Mở `http://127.0.0.1:8050`. Nếu `.venv` đã có, bỏ qua bước tạo venv. Cách này dùng `data/dashboard.json`; **không cần** SQL Server, raw CSV, `.env` hoặc model binary.
 
-Muốn chạy SQL Server và pipeline đầy đủ, cài Docker Desktop + ODBC Driver 18, đặt nguồn đúng contract, rồi:
+## Chạy toàn bộ pipeline
+
+Phần này cần **Docker Desktop**, **ODBC Driver 18 for SQL Server** trên host, Python 3.12 và CSV đúng contract. Không cần các thành phần đó nếu chỉ xem dashboard.
+
+### 1. Cấu hình và khởi động SQL Server
 
 ```powershell
-Copy-Item .env.example .env
-# Điền secret local vào .env trước khi chạy Docker.
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+# Mở .env và điền SQLSERVER_SA_PASSWORD mạnh, chỉ giữ trên máy.
 docker compose up -d sqlserver
+docker compose logs --tail 30 sqlserver
 .venv\Scripts\python.exe pipeline/manage.py migrate
+```
+
+Đợi SQL Server sẵn sàng trước khi migrate. `.env.example` mô tả cả biến tùy chọn; `.env` có thể chỉ gồm `SQLSERVER_SA_PASSWORD`. `pipeline/config.py` mặc định host `localhost,1433`, database `DWH_Insurance` và user `sa`. Nếu volume SQL đã tồn tại, dùng **mật khẩu cũ**; đổi `.env` không đổi mật khẩu trong database. Migration V1–V14 chạy theo số và skip version đã ghi nhận.
+
+### 2. Đặt nguồn và nạp kho dữ liệu
+
+```text
+data/raw/susep.gov.br/insurance_dataset.csv
+data/raw/brvehins1/brvehins1a.csv ... brvehins1e.csv
+```
+
+```powershell
+.venv\Scripts\python.exe pipeline/validate.py --raw
 .venv\Scripts\python.exe pipeline/manage.py load-market
 .venv\Scripts\python.exe pipeline/manage.py load-risk
 .venv\Scripts\python.exe pipeline/manage.py quality
+.venv\Scripts\python.exe pipeline/manage.py status
+.venv\Scripts\python.exe pipeline/reconcile_market.py
 ```
 
-Lần clone mới không gồm raw/model binary. Xem [cài đặt đầy đủ, scoring và export](GUIDE.md#5-cài-đặt-và-chạy) trước khi chạy những bước cần dữ liệu. Database hiện có sẽ skip migration/batch đã thành công; không cần train lại model chỉ để mở dashboard.
+Loader bỏ qua batch cùng fingerprint đã hoàn tất. Lần đầu có thể mất thời gian vì hơn 10 triệu dòng. Hai quality gate SQL cần PASS trước khi coi dữ liệu sẵn sàng cho phân tích; `status` chỉ đếm dòng, không thay thế quality gate.
 
-Docker có hai profile tùy chọn:
+### 3. Score và cập nhật dashboard
+
+```powershell
+.venv\Scripts\python.exe pipeline/manage.py score
+.venv\Scripts\python.exe pipeline/manage.py export
+```
+
+`score` cần artifact model local tại `data/models/claim_risk_model_v001.joblib` và warehouse Track B đã nạp. Artifact **không có trong bản clone công khai**. Huấn luyện mới là tác vụ riêng qua `pipeline/train_risk.py`, chỉ chạy khi chủ động đánh giá lại model. Bản clone không có artifact vẫn xem được snapshot đi kèm.
+
+### Tùy chọn: Dashboard và Airflow qua Docker
 
 ```powershell
 docker compose --profile analytics up -d --build dashboard
 docker compose --profile orchestration up -d --build airflow
 ```
 
-Dash ở 8050, Airflow ở 8080. Chọn một cách chạy dashboard trên 8050. Giữ volume `sqlserver_data`; xem [Docker lưu gì và cách dừng an toàn](GUIDE.md#4-docker-thực-sự-lưu-gì).
+Dash dùng cổng `8050`, Airflow dùng `8080`, SQL Server dùng `1433`, tất cả bind local `127.0.0.1`. Chỉ chạy **một** dashboard trên cổng 8050. Compose đọc `.env` để nội suy password SQL ngay cả khi chỉ bật profile analytics.
 
-## Kiến trúc
+Airflow DAG `insurance_data_platform` có `schedule=None`: bật và trigger thủ công trong UI. Nhánh A nạp/đối soát/DQ; nhánh B kiểm foundation đã có/DQ/score/kiểm prediction. DAG **không tự nạp Track B lần đầu, không train model, không export snapshot**. Task phụ thuộc chỉ chạy sau khi task trước thành công; hai nhánh không cần join dữ liệu.
 
-```mermaid
-flowchart LR
-    A[SUSEP CSV] --> SA[Market staging]
-    SA --> DA[Market star schema]
-    DA --> QA[Reconcile + Quality Gate A]
-    B[brvehins1 CSV] --> SB[Risk staging]
-    SB --> DB[Risk star schema]
-    DB --> QB[Quality Gate B]
-    QB --> ML[Bounded ML + prediction store]
-    QA --> EX[SQL aggregate export]
-    DB --> EX
-    ML --> EX
-    EX --> JSON[Snapshot JSON]
-    JSON --> DASH[Plotly Dash]
-    AF[Airflow] -. điều phối .-> QA
-    AF -. điều phối .-> ML
-```
+## Data contract
 
-Python streaming giữ RAM có giới hạn và lineage; SQL Server chịu trách nhiệm kiểu dữ liệu, dimensions/facts, DQ và index; Airflow điều phối hai nhánh độc lập. Dash đọc snapshot để không quét toàn fact khi người dùng đổi bộ lọc. [GUIDE](GUIDE.md#2-luồng-dữ-liệu-từ-đầu-đến-cuối) giải thích từng bước bằng ngôn ngữ đơn giản.
+- **SUSEP:** header phải là `company_code,company_name,year_month,product,state,premiums,claims,claim_premium_ratio`. Một dòng là một tổ hợp company/month/product/state. `premiums` và `claims` là aggregate nguồn; raw text được giữ để audit, số phân tích dùng `DECIMAL(38,18)` với chính sách làm tròn đã định. `claim_premium_ratio` có thể `NA`; loss ratio trên dashboard được tính từ `SUM(claims) / SUM(premiums)` khi mẫu số dương.
+- **brvehins1:** 23 cột mô tả driver/vehicle/geography, exposure, premium và năm nhóm claim. Một dòng là **quan sát rủi ro tổng hợp**, không mặc định là một khách hàng, hợp đồng hay claim event. `HasClaim = 1` khi tổng năm `ClaimNb* > 0`; claim frequency = tổng số claim / exposure khi exposure dương. Dòng trùng nội dung vẫn có lineage riêng.
+- **ML:** feature chỉ dùng `Gender`, `DrivAge`, `VehYear`, `VehModel`, `VehGroup`, `Area`, `StateAb`. Split theo `SourceRecordHash` để hạn chế rò rỉ bản ghi trùng. Mẫu 100.004 dòng có giới hạn tài nguyên; test held-out 20.000 dòng. Nguồn B không có thời điểm sự kiện nên model chỉ là **cross-sectional HasClaim association**, không phải xác suất underwriting tương lai.
+
+Đơn vị tiền SUSEP chưa được xác nhận đầy đủ; giao diện ghi **source units**, không gắn BRL. Năm 2023 của SUSEP chỉ có đến tháng 07, nên tổng năm đó là phần năm.
 
 ## Cấu trúc repository
 
 ```text
-dashboard/      Dash app, bộ lọc, biểu đồ, CSS và hình minh họa
-pipeline/       Ingest, profiling, ML, export, CLI và DAG Airflow
-database/       Migration V1–V14 và workload performance SQL
-infra/          Dockerfile và dependency của container
-data/           Raw/model local, output sinh lại, snapshot và evidence
-tests/          Kiểm tính nhất quán dữ liệu và thao tác trình duyệt
+dashboard/   Ứng dụng Dash, CSS, ảnh giao diện và sơ đồ kiến trúc
+pipeline/    Ingest, profiling, quality orchestration, ML, export và CLI
+database/    Migration V1–V14 và SQL benchmark
+infra/       Dockerfile và dependency riêng cho Dash/Airflow
+data/        Snapshot/evidence công khai; raw, model, output chỉ ở local
+tests/       Unit tests và kiểm tra trình duyệt
 ```
 
-Chỉ bốn tài liệu chính ở root: **README** để giới thiệu, **[GUIDE](GUIDE.md)** để học/vận hành/phỏng vấn, **[CHANGELOG](CHANGELOG.md)** để đọc lịch sử/bằng chứng và **[AGENTS](AGENTS.md)** cho AI tiếp quản. Không cần lần theo nhiều thư mục docs/report cũ.
+`docker-compose.yml` ở root để nhìn thấy ngay cách chạy hệ thống; Dockerfile ở `infra/`. `data/` là nơi đặt **file đầu vào/đầu ra**; `database/` là **mã SQL tạo và nâng cấp database**. Dữ liệu SQL thật nằm trong named volume `sqlserver_data` tại `/var/opt/mssql`, không nằm trong hai thư mục đó. `airflow_state` giữ metadata SQLite local của Airflow; `airflow_logs` giữ task logs. `data/raw` và `data/models` được mount chỉ đọc vào container cần dùng.
 
-## Kết quả có thể kiểm chứng
+`docker compose stop` chỉ dừng service; `docker compose down` giữ named volumes mặc định. **Không dùng `docker compose down -v` nếu cần giữ database.** Giữ cùng Compose project name khi khởi động lại để dùng đúng volume; Git không phải bản backup SQL.
 
-- Staging/fact khớp 8.338.214 dòng Track A và 1.965.355 dòng Track B; hai executable quality gate chạy được trên SQL thật.
-- Batch scoring held-out 20.000 dòng, khóa technical identity/model/population chống nhân đôi khi rerun.
-- Hai covering indexes giảm logical reads **98,94%** và **98,82%** cho hai workload SUSEP đã đo; đổi lại khoảng 924,51 MB storage và thêm chi phí ghi.
-- Airflow đã có happy path 12/12 task và controlled failure chặn đúng consumer của track lỗi trong bằng chứng lịch sử.
-- Dashboard thay Power BI bằng app có thể chạy từ snapshot đi kèm; không cần artifact `.pbix` hoặc GUI desktop.
+## Kết quả và kiểm chứng
 
-Xem ngày đo, run ID và phân biệt bằng chứng hiện tại/lịch sử trong [CHANGELOG](CHANGELOG.md). Các kết quả này không phải cam kết production: nguồn B thiếu event time, model chỉ cross-sectional association, Airflow standalone dùng SQLite, chưa có auth/RBAC cho dashboard và chưa nghiệm thu fresh rebuild phá hủy dữ liệu trong phiên dọn repo.
+- **11/11/2026:** staging và fact khớp 8.338.214 dòng Track A và 1.965.355 dòng Track B; hai SQL quality gate PASS. Airflow `dags test` hoàn tất **12/12 task**, là lần chạy kiểm thử CLI, không phải scheduler production.
+- **09/2026, model held-out lịch sử:** ROC-AUC **0,808815**, Average Precision **0,513523**, positive prevalence **18,845%** trên 20.000 dòng. Đây là số đo của artifact hiện có, không phải kết quả train mới hoặc metric theo filter dashboard.
+- **24/09/2026, benchmark SQL lịch sử:** hai covering indexes giảm logical reads **98,94%** và **98,82%** cho hai workload SUSEP đã đo; cần thêm khoảng **924,51 MB** index và chi phí ghi. Không suy rộng sang mọi truy vấn.
+- **11/11/2026, giao diện:** 5 unit tests và kiểm tra Edge/Playwright trên desktop/mobile, bộ lọc, CSV, PNG và health endpoint PASS. Snapshot có `exported_at_utc`; xem chính thời điểm đó trên dashboard để biết độ mới của số liệu.
 
-## Kiểm tra
+Chạy lại phần kiểm tra có thể thực hiện local:
 
 ```powershell
 .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 .venv\Scripts\python.exe pipeline/validate.py
 .venv\Scripts\python.exe -m unittest discover -s tests -p test_*.py
 docker compose --profile analytics --profile orchestration config -q
-git diff --check
 ```
 
-App đang chạy + Microsoft Edge: `python tests/browser_check.py` kiểm ba trang, filter năm/bang, CSV và màn hình nhỏ. Kiểm SQL hiện có: `python pipeline/manage.py status`, `quality`, `export`. [Xử lý sự cố](GUIDE.md#13-kiểm-tra-và-xử-lý-lỗi) có giải thích ODBC, port, credential, model và snapshot.
+Khi app đã chạy và có Microsoft Edge, dùng `.venv\Scripts\python.exe tests/browser_check.py` để kiểm giao diện. `data/evidence.json` giữ evidence máy đọc của các lần chạy đã ghi; các phép đo lịch sử không được xem là phép đo mới. Chưa nghiệm thu fresh rebuild/restore cô lập, dashboard chưa có auth/RBAC, Airflow dùng standalone/SQLite cho local.
 
-## Dữ liệu và giấy phép
+## Giấy phép và dữ liệu
 
-`.env`, raw CSV, model binary, môi trường Python và output runtime nằm ngoài Git. Repo giữ SQL/Python, tài liệu và aggregate snapshot; không nhúng secret trong app. Quyền sử dụng dữ liệu nguồn cần được kiểm theo nơi cung cấp, độc lập với giấy phép mã nguồn [LICENSE](LICENSE).
+Mã nguồn theo [LICENSE](LICENSE). `.env`, CSV gốc, model binary, runtime output và venv không được đưa lên Git. Dùng dữ liệu nguồn theo quyền của nơi cung cấp; snapshot đi kèm chỉ gồm aggregate phục vụ trình diễn.

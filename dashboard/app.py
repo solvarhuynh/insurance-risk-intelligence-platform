@@ -13,7 +13,8 @@ from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
 
-BLUE, TEAL, ORANGE, INK, MUTED = "#003366", "#007c83", "#d17b52", "#13334b", "#61768a"
+BLUE, TEAL, ORANGE, INK, MUTED = "#003366", "#007c83", "#b66a45", "#13334b", "#61768a"
+SCORE, CONTEXT = "#7560a6", "#93a5b5"
 PALE_BLUE, GRID = "#9db9cb", "#e5edf2"
 EXPLORER_PAGE_SIZE = 15
 STATES = {
@@ -120,7 +121,7 @@ def figure(key, x, y):
                    tickfont=dict(size=11)),
         yaxis=dict(title=dict(text=y, standoff=12), gridcolor=GRID, zeroline=False,
                    automargin=True, tickfont=dict(size=11), nticks=5),
-        legend=dict(orientation="h", y=1.16, x=0, title=None, font=dict(size=11)),
+        legend=dict(orientation="h", y=1.02, yanchor="bottom", x=0, title=None, font=dict(size=11)),
         hovermode="x unified", hoverlabel=dict(bgcolor="white", font_size=12, font_color=INK),
         uirevision=key, separators=".,", bargap=.32,
     )
@@ -198,15 +199,15 @@ def market_page():
                        "market-trend", wide=True, headline_id="market-takeaway",
                        controls=dcc.RadioItems(id="market-grain", options=[{"label": "Monthly", "value": "monthly"},
                                               {"label": "Annual", "value": "annual"}], value="monthly", className="segmented"),
-                       footer=[html.Span(className="legend-dot premium"), "Premiums", html.Span(className="legend-dot orange"), "Claims",
-                               html.Span("2023 includes January–July only", className="chart-caveat")]),
+                       footer="2023 includes January–July only. Claims / premiums is a descriptive ratio, not a profit margin."),
             chart_card("Which companies lead premium volume?",
-                       "Top 10 insurers · premiums in billions of source units. Full names on hover.",
+                       "Top 10 insurers; premiums in billions of source units. Hover for source names and shares of all selected premiums.",
                        "market-companies"),
             chart_card("Where is premium volume concentrated?",
-                       "Top 8 product lines · premiums in billions of source units. Source codes on hover.",
+                       "Top 8 product lines; premiums in billions of source units. The same selection, viewed by product rather than insurer.",
                        "market-products"),
         ], className="chart-grid"),
+        html.Div(id="market-story", className="insight-strip", **{"aria-live": "polite"}),
     ]
 
 
@@ -218,21 +219,36 @@ def risk_page():
                     "MODEL EVALUATION", f"{metrics['rows']:,} held-out observations", "Historical evaluation · September 2026"),
         html.Div([
             state_filter("risk", sorted(table("risk", "segments")["state"].unique())),
-            html.Div([
-                html.Div([html.Span("ROC-AUC"), html.Strong(f"{metrics['roc_auc']:.3f}")]),
-                html.Div([html.Span("Average precision"), html.Strong(f"{metrics['average_precision']:.3f}")]),
-                html.Small("Full held-out set · historical metrics · unaffected by geography"),
-            ], className="model-summary"),
             html.Button([icon("reset"), "Reset"], id="risk-reset", className="button quiet"), export_button("risk"),
         ], className="filter-bar risk-filter"),
-        html.Div(id="risk-metrics", className="metrics", **{"aria-live": "polite"}),
+        html.Div([html.Span("01 / OBSERVED PORTFOLIO", className="eyebrow"),
+                  html.H2("Start with the warehouse population"),
+                  html.P("All filtered motor observations. Compare claim share by age, with the source-label mix as context.")],
+                 className="section-heading"),
+        html.Div(id="risk-metrics", className="metrics warehouse-metrics", **{"aria-live": "polite"}),
         html.Div([
-            chart_card("Where model scores are concentrated", "Held-out association scores in 0.05-wide bands; not validated future claim probabilities.",
-                       "risk-distribution", headline_id="risk-takeaway"),
-            chart_card("How scores relate to observed claims", "Observed HasClaim share and mean model score within each held-out score band.", "risk-observed"),
             chart_card("Observed claim share varies by age group", "Share of observations with HasClaim, across the full filtered risk warehouse.", "risk-age"),
             chart_card("The observation mix behind the analysis", "Counts by source Gender label, including corporate and unknown records.", "risk-gender"),
         ], className="chart-grid"),
+        html.Div([
+            html.Div([html.Span("02 / HELD-OUT EVALUATION", className="eyebrow"),
+                      html.H2("Then test what the model score separates"),
+                      html.P("A separate held-out sample. Geography filters these plots; historical evaluation metrics below stay fixed.")]),
+            html.Div(id="risk-model-metric", **{"aria-live": "polite"}),
+        ], className="section-heading model-heading"),
+        html.Div([
+            html.Div([html.Span("ROC-AUC"), html.Strong(f"{metrics['roc_auc']:.3f}")]),
+            html.Div([html.Span("Average precision"), html.Strong(f"{metrics['average_precision']:.3f}")]),
+            html.Small("Full held-out set · historical metrics · unaffected by geography · September 2026"),
+        ], className="model-summary"),
+        html.Div([
+            chart_card("Where model scores are concentrated", "Held-out association scores in 0.05-wide bands; not validated future claim probabilities.",
+                       "risk-distribution", headline_id="risk-takeaway",
+                       footer="Darker bins identify scores below 0.20 for description only; 0.20 is not a classification threshold."),
+            chart_card("How scores relate to observed claims", "The same held-out score bands: observed HasClaim share versus mean model score.",
+                       "risk-observed", footer="Hover for band size. Small groups can fluctuate; gaps mean no observations in a band."),
+        ], className="chart-grid"),
+        html.Div(id="risk-story", className="insight-strip", **{"aria-live": "polite"}),
     ]
 
 
@@ -268,7 +284,7 @@ def data_explorer():
     states = sorted(table("market", "monthly")["state"].unique())
     return html.Section([
         html.Div([html.Div([html.H2("Inspect the data behind the charts"),
-                           html.P("Browse actual aggregate rows from the dated SQL export. Select a source and a state.")]),
+                           html.P("Browse actual aggregate rows from the dated SQL export. Premiums, claims and exposure retain source units; shares are percentages.")]),
                   html.Span("DATA EXPLORER", className="small-badge")], className="chart-heading"),
         html.Div([
             dcc.RadioItems(id="data-track", value="market", options=[
@@ -294,13 +310,15 @@ def platform_page():
     perf, counts = pd.DataFrame(data["performance"]), data["counts"]
     matched = sum(counts[f"{p}_staging"] == counts[f"{p}_fact"] for p in ("market", "risk"))
     reductions = 100 * (1 - perf["after_reads"] / perf["before_reads"])
-    chart = figure("SQL logical reads", "Logical reads · log scale", "")
-    for col, name, color in [("before_reads", "Before index", PALE_BLUE), ("after_reads", "After index", TEAL)]:
-        chart.add_bar(y=perf["workload"], x=perf[col], name=name, orientation="h", marker_color=color,
+    chart = figure("SQL logical reads", "Logical reads · SQL page accesses", "")
+    for col, name, color in [("before_reads", "Before index", CONTEXT), ("after_reads", "After index", TEAL)]:
+        chart.add_bar(y=[f"Q{i + 1}" for i in range(len(perf))], x=perf[col], name=name, orientation="h", marker_color=color,
+                      customdata=perf["workload"],
                       text=[f"{v:,}" for v in perf[col]], textposition="outside", cliponaxis=False,
-                      hovertemplate="%{y}<br>%{fullData.name}: %{x:,} logical reads<extra></extra>")
-    chart.update_layout(barmode="group", bargap=.48, margin=dict(l=12, r=64, t=50, b=16))
-    chart.update_xaxes(type="log", range=[2, 6.1], tickvals=[100, 1000, 10000, 100000, 1000000], ticktext=["100", "1K", "10K", "100K", "1M"])
+                      hovertemplate="%{y} · %{customdata}<br>%{fullData.name}: %{x:,} logical reads<extra></extra>")
+    chart.update_layout(barmode="group", bargap=.48, margin=dict(l=12, r=65, t=56, b=24))
+    chart.update_xaxes(type="linear", range=[0, float(perf["before_reads"].max()) * 1.25], nticks=4,
+                      showgrid=True, gridcolor=GRID)
     chart.update_yaxes(autorange="reversed", showgrid=False, ticklabelstandoff=12)
     return [
         page_header("PLATFORM ASSURANCE / ENGINEERING", "See the data behind the platform",
@@ -323,7 +341,7 @@ def platform_page():
                           html.Small(f"{perf.iloc[i]['before_reads']:,} → {perf.iloc[i]['after_reads']:,} pages")],
                          className="benchmark-stat") for i, value in enumerate(reductions)
             ], className="benchmark-summary")], className="benchmark-layout"),
-            html.Div("Logical reads measure SQL page accesses. These results do not measure end-to-end dashboard speed.", className="chart-footnote"),
+            html.Div("Linear scale starts at zero. Short after-index bars reflect the measured reduction; labels show exact counts. This is not end-to-end dashboard speed.", className="chart-footnote"),
         ], className="chart-card benchmark-card"),
     ]
 
@@ -355,7 +373,8 @@ app.layout = html.Div([
 @app.callback(Output("page-content", "children"), Output("source-meta", "children"), Input("section", "value"))
 def render_page(section):
     try:
-        return {"market": market_page, "risk": risk_page, "platform": platform_page}.get(section, market_page)(), provenance()
+        page = {"market": market_page, "risk": risk_page, "platform": platform_page}.get(section, market_page)()
+        return html.Div(page, key=section, id=f"view-{section}"), provenance()
     except (OSError, ValueError, KeyError) as exc:
         return html.Div([html.H1("A data snapshot is needed"), html.P(str(exc)), html.Code("python pipeline/manage.py export")], className="snapshot-error"), ""
 
@@ -427,7 +446,7 @@ def ranking_label(label, key):
 
 
 @app.callback(Output("market-metrics", "children"), Output("market-trend", "figure"), Output("market-companies", "figure"),
-              Output("market-products", "figure"), Output("market-takeaway", "children"),
+              Output("market-products", "figure"), Output("market-takeaway", "children"), Output("market-story", "children"),
               Input("market-state", "value"), Input("market-years", "value"), Input("market-grain", "value"))
 def update_market(state, years, grain="monthly"):
     monthly, companies, products = market_frames(state, years)
@@ -448,9 +467,11 @@ def update_market(state, years, grain="monthly"):
     plot = figure("Market trend " + grain, "Year" if annual else "Month", "Billions · source units")
     for column, name, color in [("premium", "Premiums", BLUE), ("claims", "Claims", ORANGE)]:
         plot.add_scatter(x=trend["period"], y=trend[column] / 1e9, name=name, mode="lines+markers" if annual else "lines",
-                         line=dict(color=color, width=2.6), marker=dict(size=5), fill="tozeroy" if column == "premium" else None,
-                         fillcolor="rgba(0,51,102,0.07)", hovertemplate=f"{name}: %{{y:,.2f}}B source units<extra></extra>")
-    plot.update_layout(showlegend=False)
+                         line=dict(color=color, width=2.6, dash="dash" if column == "claims" else "solid"), marker=dict(size=5),
+                         customdata=["Jan–Jul only" if annual and str(p) == "2023" else "Reported period" for p in trend["period"]],
+                         hovertemplate=f"%{{x}} · %{{customdata}}<br>{name}: %{{y:,.2f}}B source units<extra></extra>")
+    plot.update_layout(showlegend=True, margin=dict(t=54))
+    plot.update_yaxes(rangemode="tozero")
     plot.update_xaxes(type="category", nticks=8) if annual else plot.update_xaxes(type="date", tickformat="%Y", nticks=8)
     if monthly.empty:
         empty_figure(plot)
@@ -459,12 +480,13 @@ def update_market(state, years, grain="monthly"):
         ranked = frame.groupby(key, as_index=False)["premium"].sum().nlargest(limit, "premium").sort_values("premium")
         labels = [snapshot()["market"]["company_names"].get(str(v), str(v)) if key == "company" else product_label(v) for v in ranked[key]]
         short = [ranking_label(label, key) for label in labels]
-        bars = figure("Ranking " + key, "", "")
+        bars = figure("Ranking " + key, "Premiums (B)", "")
         # Technical IDs keep distinct bars when abbreviated source labels coincide.
         bars.add_bar(x=ranked["premium"] / 1e9, y=ranked[key].astype(str), orientation="h",
-                     marker_color=[BLUE if i == len(ranked) - 1 else PALE_BLUE for i in range(len(ranked))], customdata=labels,
+                     marker_color=[BLUE if i == len(ranked) - 1 else PALE_BLUE for i in range(len(ranked))],
+                     customdata=list(zip(labels, [100 * v / premium if premium > 0 else None for v in ranked["premium"]])),
                      text=[f"{v / 1e9:,.1f}" for v in ranked["premium"]], textposition="outside", cliponaxis=False,
-                     hovertemplate="%{customdata}<br>Premiums: %{x:,.2f}B source units<extra></extra>")
+                     hovertemplate="%{customdata[0]}<br>Premiums: %{x:,.2f}B source units<br>%{customdata[1]:.1f}% of all selected premiums<extra></extra>")
         bars.update_yaxes(type="category", tickvals=ranked[key].astype(str), ticktext=short,
                           showgrid=False, ticklabelstandoff=18, tickfont=dict(size=11))
         bars.update_xaxes(showgrid=True, gridcolor=GRID, nticks=4, rangemode="tozero")
@@ -474,11 +496,18 @@ def update_market(state, years, grain="monthly"):
         ranks.append(bars)
     headline = (f"Claims account for {number(claim_ratio, percent=True)} of premium volume" if claim_ratio is not None
                 else "Premiums and claims within your selection")
-    return cards, plot, *ranks, headline if observations else "No market observations match this selection"
+    top_company = companies.groupby("company")["premium"].sum().nlargest(10).sum()
+    top_product = products.groupby("product")["premium"].sum().nlargest(8).sum()
+    story = (f"The same premium base, two views: the top 10 insurers account for {number(ratio(top_company, premium), percent=True)} "
+             f"and the top 8 product lines for {number(ratio(top_product, premium), percent=True)} of selected premiums. "
+             "Use the trend to locate changes, then the rankings to see where volume is concentrated. These views do not identify causes."
+             if observations else "No market observations match this selection.")
+    return cards, plot, *ranks, headline if observations else "No market observations match this selection", story
 
 
 @app.callback(Output("risk-metrics", "children"), Output("risk-distribution", "figure"), Output("risk-observed", "figure"),
-              Output("risk-age", "figure"), Output("risk-gender", "figure"), Output("risk-takeaway", "children"), Input("risk-state", "value"))
+              Output("risk-age", "figure"), Output("risk-gender", "figure"), Output("risk-takeaway", "children"),
+              Output("risk-model-metric", "children"), Output("risk-story", "children"), Input("risk-state", "value"))
 def update_risk(state):
     segments, scores = risk_frames(state)
     population, observations = int(scores["observations"].sum()), int(segments["observations"].sum())
@@ -489,42 +518,54 @@ def update_risk(state):
         metric("Mean model score", f"{scores['score_sum'].sum() / population:.3f}" if population else "—", f"{population:,} filtered held-out observations", symbol="risk"),
     ]
     scores = scores.assign(band=scores["band"].clip(upper=19))
-    bands = scores.groupby("band", as_index=False)[["observations", "score_sum", "positives"]].sum()
+    bands = scores.groupby("band")[["observations", "score_sum", "positives"]].sum().reindex(range(20), fill_value=0).reset_index()
     x = (bands["band"] + .5) / 20
     distribution = figure("Score distribution", "Model score", "Held-out observations")
-    distribution.add_bar(x=x, y=bands["observations"], width=.038, marker_color=[BLUE if b < 4 else PALE_BLUE for b in bands["band"]],
+    distribution.add_bar(x=x, y=bands["observations"], width=.05, marker_color=[SCORE if b < 4 else "#c9c2d9" for b in bands["band"]],
                          customdata=list(zip(bands["band"] / 20, (bands["band"] + 1) / 20)),
                          hovertemplate="Score band: %{customdata[0]:.2f}–%{customdata[1]:.2f}<br>Observations: %{y:,}<extra></extra>")
     distribution.update_xaxes(range=[0, 1], dtick=.2)
+    distribution.update_layout(bargap=0, hovermode="closest")
+    distribution.update_yaxes(rangemode="tozero")
     observed = figure("Observed claim share", "Model score band", "Share / score (%)")
+    denominator = bands["observations"].replace(0, float("nan"))
+    band_details = list(zip(bands["band"] / 20, (bands["band"] + 1) / 20, bands["observations"], bands["positives"]))
     for values, name, color, dash in [
-        (100 * bands["positives"] / bands["observations"], "Observed HasClaim", BLUE, "solid"),
-        (100 * bands["score_sum"] / bands["observations"], "Mean model score", ORANGE, "dash"),
+        (100 * bands["positives"] / denominator, "Observed HasClaim", ORANGE, "solid"),
+        (100 * bands["score_sum"] / denominator, "Mean model score", SCORE, "dash"),
     ]:
-        observed.add_scatter(x=x, y=values, mode="lines+markers", name=name, customdata=bands["observations"],
+        observed.add_scatter(x=x, y=values, mode="lines+markers", name=name, customdata=band_details, connectgaps=False,
                              line=dict(color=color, width=2.3, dash=dash), marker=dict(size=5),
-                             hovertemplate="%{fullData.name}: %{y:.1f}%<br>Band size: %{customdata:,}<extra></extra>")
-    observed.update_layout(margin=dict(t=50))
+                             hovertemplate="Band: %{customdata[0]:.2f}–%{customdata[1]:.2f}<br>%{fullData.name}: %{y:.1f}%<br>Band size: %{customdata[2]:,}<br>Observed HasClaim: %{customdata[3]:,}<extra></extra>")
+    observed.update_layout(margin=dict(t=70))
     observed.update_xaxes(range=[0, 1], dtick=.2)
     observed.update_yaxes(range=[0, 105], ticksuffix="%")
     age = segments.assign(age=segments["age"].replace({"Không rõ": "Unknown"}))
     age = age.groupby("age")[["observations", "has_claim"]].sum().reindex(["18-25", "26-35", "36-45", "46-55", ">55", "Unknown"]).dropna().reset_index()
     shares = 100 * age["has_claim"] / age["observations"]
     age_plot = figure("Driver age", "Source age group", "Observations with a claim (%)")
-    age_plot.add_bar(x=age["age"], y=shares, marker_color=["#c7d2dc" if a == "Unknown" else TEAL for a in age["age"]],
-                     text=[f"{v:.1f}%" for v in shares], textposition="outside", cliponaxis=False, customdata=age["observations"],
-                     hovertemplate="%{x}<br>HasClaim: %{y:.1f}%<br>Observations: %{customdata:,}<extra></extra>")
+    age_plot.add_bar(x=age["age"], y=shares, marker_color=[CONTEXT if a == "Unknown" else ORANGE for a in age["age"]],
+                     text=[f"{v:.1f}%" for v in shares], textposition="outside", cliponaxis=False,
+                     customdata=list(zip(age["observations"], age["has_claim"])),
+                     hovertemplate="%{x}<br>HasClaim: %{y:.1f}%<br>Observations: %{customdata[0]:,}<br>HasClaim count: %{customdata[1]:,}<extra></extra>")
+    if observations:
+        overall = 100 * segments["has_claim"].sum() / observations
+        age_plot.add_hline(y=overall, line_dash="dot", line_color=MUTED)
+        age_plot.add_annotation(text=f"Dotted line · selected population {overall:.1f}%", x=0, y=1.06,
+                                xref="paper", yref="paper", xanchor="left", showarrow=False,
+                                font=dict(size=10, color=MUTED))
+        age_plot.update_layout(margin=dict(t=42))
     age_plot.update_yaxes(range=[0, max(10, float(shares.max()) * 1.2)] if not shares.empty else [0, 100])
     gender = segments.assign(gender=segments["gender"].replace({"Không rõ": "Unknown"}))
     gender = gender.groupby("gender", as_index=False)["observations"].sum().sort_values("observations")
     gender_plot = figure("Profile labels", "Observations", "")
     gender_plot.add_bar(x=gender["observations"], y=gender["gender"], orientation="h",
-                        marker_color=["#c7d2dc" if g == "Unknown" else TEAL for g in gender["gender"]],
+                        marker_color=CONTEXT, customdata=100 * gender["observations"] / observations if observations else [],
                         text=[number(v) for v in gender["observations"]], textposition="outside", cliponaxis=False,
-                        hovertemplate="%{y}<br>Observations: %{x:,}<extra></extra>")
+                        hovertemplate="Source label: %{y}<br>Observations: %{x:,}<br>%{customdata:.1f}% of selected warehouse<extra></extra>")
     gender_plot.update_layout(margin=dict(r=65), bargap=.48)
     gender_plot.update_yaxes(showgrid=False, ticklabelstandoff=14)
-    gender_plot.update_xaxes(showgrid=True, gridcolor=GRID, nticks=4)
+    gender_plot.update_xaxes(showgrid=True, gridcolor=GRID, nticks=4, rangemode="tozero")
     for chart in (distribution, observed):
         if not population:
             empty_figure(chart)
@@ -533,7 +574,15 @@ def update_risk(state):
             empty_figure(chart)
     below = bands.loc[bands["band"] < 4, "observations"].sum()
     headline = f"{number(ratio(below, population), percent=True)} of held-out scores fall below 0.20" if population else "No held-out scores match this selection"
-    return cards, distribution, observed, age_plot, gender_plot, headline
+    selected = bands.loc[bands["band"] < 4]
+    low_share = ratio(selected["positives"].sum(), selected["observations"].sum())
+    selected = bands.loc[bands["band"] >= 10]
+    high_share = ratio(selected["positives"].sum(), selected["observations"].sum())
+    story = (f"In the same held-out sample, scores below 0.20 have {number(low_share, percent=True)} observed HasClaim "
+             f"({below:,} observations); scores at or above 0.50 have {number(high_share, percent=True)} "
+             f"({int(selected['observations'].sum()):,} observations). These are descriptive groups, not decision thresholds "
+             "or validated future probabilities." if population else "No held-out observations match this geography.")
+    return cards[:3], distribution, observed, age_plot, gender_plot, headline, cards[3], story
 
 
 @app.callback(Output("market-download", "data"), Input("market-export", "n_clicks"), State("market-state", "value"), State("market-years", "value"), prevent_initial_call=True)

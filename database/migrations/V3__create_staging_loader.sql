@@ -2,7 +2,7 @@
 --
 -- SQL Server on this Linux runtime cannot safely use FORMAT=CSV together with
 -- an internal identity column while retaining source-line ordinals. The actual
--- loader is scripts/load_brvehins1_to_staging.py, which streams RFC-aware CSV
+-- loader is pipeline/load_risk.py, which streams RFC-aware CSV
 -- rows and assigns SourceRowNumber before parameterized insertion.
 
 USE [DWH_Insurance];

@@ -18,9 +18,9 @@ PROJECT = Path("/opt/airflow/project")
 sys.path.insert(0, str(PROJECT / "pipeline"))
 from config import connect
 RAW_SUSEP = PROJECT / "data/raw/susep.gov.br/insurance_dataset.csv"
-SUSEP_LOADER = PROJECT / "pipeline" / "load_susep_to_staging.py"
-SUSEP_RECONCILER = PROJECT / "pipeline" / "reconcile_susep_source_to_fact.py"
-RISK_SCORER = PROJECT / "pipeline" / "predict_risk_batch.py"
+SUSEP_LOADER = PROJECT / "pipeline" / "load_market.py"
+SUSEP_RECONCILER = PROJECT / "pipeline" / "reconcile_market.py"
+RISK_SCORER = PROJECT / "pipeline" / "score_risk.py"
 RISK_POPULATION = "bounded_held_out_test"
 
 

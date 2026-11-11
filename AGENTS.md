@@ -22,11 +22,11 @@
 - Local Python3.12: `.venv\Scripts\python.exe -m dashboard.app`, mở `http://127.0.0.1:8050`.
 - CLI SQL: `python pipeline/manage.py migrate|load-market|load-risk|quality|status|score|export` (chọn một action). Migrate giữ nguyên version V1–V14, sort theo số, skip lịch sử đã áp dụng.
 - Config SQL: `pipeline/config.py` đọc `.env`; không in secret/connection string ra output. Migration hiện cố định tên `DWH_Insurance`.
-- Static: `python pipeline/validate_repo.py`; tùy chọn `--raw` khi đã có CSV local.
+- Static: `python pipeline/validate.py`; tùy chọn `--raw` khi đã có CSV local.
 - Tests: `python -m unittest discover -s tests -p test_*.py`; browser: chạy app rồi `python tests/browser_check.py` (Playwright + Edge).
 - Compose: `docker compose --profile analytics up -d --build dashboard`; Airflow profile `orchestration`. Dockerfile nằm trong `infra/`.
 - SQL quality gate phải drain tất cả resultsets (`cursor.nextset`) để nhận terminal THROW. Airflow run ID được đổi UUID5 trước batch scoring.
-- Airflow DAG ở `pipeline/airflow_dag.py`, scan qua `.airflowignore`. B yêu cầu foundation/model có sẵn; DAG không tự train và chưa tự export snapshot.
+- Airflow DAG ở `pipeline/dag.py`, scan qua `.airflowignore`. B yêu cầu foundation/model có sẵn; DAG không tự train và chưa tự export snapshot.
 
 ## Tiếp quản và cập nhật
 

@@ -52,11 +52,11 @@ def load(track: str) -> None:
     import os
     server = os.getenv("SQLSERVER_HOST", "localhost,1433")
     if track == "market":
-        run_script("load_susep_to_staging.py", "--server", server)
+        run_script("load_market.py", "--server", server)
         procedures = ("dwh.sp_LoadSusepDimensions", "dwh.sp_LoadFactSusepInsuranceMarket")
     else:
         for suffix in "abcde":
-            run_script("load_brvehins1_to_staging.py", "--source-file", f"brvehins1{suffix}.csv", "--server", server)
+            run_script("load_risk.py", "--source-file", f"brvehins1{suffix}.csv", "--server", server)
         procedures = ("dwh.sp_LoadCanonicalDimensions", "dwh.sp_LoadFactRiskObservation")
     with connect() as connection:
         for procedure in procedures:
@@ -92,7 +92,7 @@ def main() -> None:
     elif action == "status":
         status()
     else:
-        run_script("export_dashboard.py" if action == "export" else "predict_risk_batch.py")
+        run_script("export_dash.py" if action == "export" else "score_risk.py")
 
 
 if __name__ == "__main__":

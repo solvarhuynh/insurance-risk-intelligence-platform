@@ -1,12 +1,12 @@
 config.py
-export_dashboard.py
+export_dash.py
 load_.*\.py
 manage.py
-modeling.py
-predict_risk_batch.py
+model.py
+score_risk.py
 profile_.*\.py
 reconcile_.*\.py
 run_.*\.py
-train_risk_model.py
-validate_repo.py
+train_risk.py
+validate.py
 __pycache__

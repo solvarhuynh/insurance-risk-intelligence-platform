@@ -118,7 +118,7 @@ Xem ngày đo, run ID và phân biệt bằng chứng hiện tại/lịch sử t
 
 ```powershell
 .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.venv\Scripts\python.exe pipeline/validate_repo.py
+.venv\Scripts\python.exe pipeline/validate.py
 .venv\Scripts\python.exe -m unittest discover -s tests -p test_*.py
 docker compose --profile analytics --profile orchestration config -q
 git diff --check

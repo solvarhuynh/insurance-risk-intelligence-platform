@@ -2,12 +2,20 @@
 
 File này là nơi ghi lịch sử phát triển/kiểm tra duy nhất. [GUIDE](GUIDE.md) giải thích kiến trúc và cách học; [AGENTS](AGENTS.md) bàn giao trạng thái hiện hành. Log tác vụ Airflow và audit ingestion/DQ vẫn nằm trong volume/database vì có vai trò vận hành riêng.
 
+## 11/11/2026 — Tối giản thêm cấu trúc và tên file
+
+- Rút gọn tên Python dài trong `pipeline/`: `load_market`, `load_risk`, `profile_market`, `profile_risk`, `profile_precision`, `reconcile_market`, `model`, `train_risk`, `score_risk`, `export_dash`, `cdc_demo`, `dag`, `validate`. Các import, Airflow path, CLI và tài liệu đã cập nhật theo tên mới.
+- Xóa `dashboard/__init__.py`, `pipeline/__init__.py` vì Python hiện đại chạy được namespace package và hai file không có chức năng. Xóa các `.gitkeep` placeholder trong `data/models` và `data/generated`; thư mục output được tạo lúc command cần dùng. Model local thật trong `data/models` vẫn giữ nguyên.
+- Giữ 14 migration riêng vì mỗi file là một version schema đã áp dụng; không gộp chúng thành một file làm mất lịch sử nâng cấp. Giữ `infra/requirements-*` riêng vì Airflow và Dash có dependency/runtime khác nhau.
+- `.env` hiện chỉ có password là hợp lệ: host/database/user dùng default trong `config.py`, còn `AIRFLOW_SECRET_KEY` chỉ cần khi muốn tự đặt secret cho Airflow. Hướng dẫn thêm biến thủ công nằm trong GUIDE; không commit `.env`.
+- Cây Git hiện chỉ giữ các nhóm cần thiết: dashboard, pipeline, database, infra, data, tests và tài liệu root. Tên dài của các thư mục/file cũ đã bị loại hoặc thay thế; file mẫu/tạm/log cũ nằm ngoài repo trong archive.
+
 ## 11/11/2026 — Chuyển sang Plotly Dash và tinh gọn repository
 
 ### Phạm vi thay đổi
 
 - Thay handoff Power BI bằng ứng dụng Dash có ba trang, filter độc lập cho Market/Risk, biểu đồ, KPI, CSV và health endpoint. Giao diện tiếng Việt, sidebar navy, nền sáng, biểu đồ teal/cam, có bố cục desktop/mobile.
-- Xuất aggregate SQL thật qua `pipeline/export_dashboard.py`; giữ thời điểm xuất, đối soát tổng số quan sát và thay file nguyên tử. Trang không dùng credential SQL và không truy vấn full fact ở mỗi callback.
+- Xuất aggregate SQL thật qua `pipeline/export_dash.py`; giữ thời điểm xuất, đối soát tổng số quan sát và thay file nguyên tử. Trang không dùng credential SQL và không truy vấn full fact ở mỗi callback.
 - Gom Python vào `pipeline/`; SQL versioned vào `database/migrations/`; Dockerfile vào `infra/`; model local vào `data/models/`. Giữ đủ V1–V14 và binary đã train.
 - Thêm CLI `pipeline/manage.py` để migrate/load/quality/status/score/export, không cần rải entrypoint SQL. Sửa Airflow paths, dùng config chung, đổi run ID sang UUID5, thêm persistent metadata/log volumes.
 - Gom toàn bộ tài liệu học/vận hành/phỏng vấn vào `GUIDE.md`; nhật ký quan trọng vào file này; handoff AI vào `AGENTS.md`. README dùng bố cục/banner/badges/ảnh ứng dụng, tham khảo hình thức `D:\aws\README.md`, không sao chép scope đồ án hoặc AWS.

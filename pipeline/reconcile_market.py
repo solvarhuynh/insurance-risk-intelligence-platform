@@ -13,7 +13,7 @@ from pathlib import Path
 import pyodbc
 import config
 
-from load_susep_to_staging import (
+from load_market import (
     SOURCE_COLUMNS,
     odbc_braced_value,
     parse_source_row,

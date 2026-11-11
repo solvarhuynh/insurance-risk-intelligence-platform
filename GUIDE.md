@@ -92,7 +92,7 @@ Chỉ cần nhớ **sáu thư mục chính**. Các thư mục ẩn `.git`, `.ven
 ├── data/
 │   ├── raw/                CSV gốc, chỉ đọc, không push
 │   ├── models/             Mô hình joblib + metadata local, không push
-│   ├── generated/          Kết quả chạy lại, có thể tái tạo, không push
+│   ├── generated/          Được tạo khi profile/train/CDC chạy, không giữ thư mục rỗng
 │   ├── dashboard.json      Snapshot aggregate có thời điểm xuất, có push
 │   └── evidence.json       Bằng chứng lịch sử gộp dạng máy đọc, có push
 └── tests/                  Kiểm tra tính nhất quán và thao tác trình duyệt
@@ -102,18 +102,20 @@ Chỉ cần nhớ **sáu thư mục chính**. Các thư mục ẩn `.git`, `.ven
 
 - `config.py`: đọc `.env`, tạo connection SQL Server. Mật khẩu lấy từ môi trường, không ghi trong code.
 - `manage.py`: cửa vào vận hành: migrate, load-market, load-risk, quality, status, score, export.
-- `load_susep_to_staging.py`, `load_brvehins1_to_staging.py`: đọc CSV theo contract, chuyển kiểu và nạp từng batch.
-- `profile_susep.py`, `profile_brvehins1.py`: thống kê nguồn bằng luồng đọc và vùng làm việc tạm; không load toàn bộ vào RAM.
-- `profile_brvehins1_numeric_precision.py`: kiểm riêng chữ số phần nguyên/phần thập phân để chọn kiểu SQL đúng.
-- `reconcile_susep_source_to_fact.py`: đọc lại raw, đối chiếu staging/fact và tổng measure. Khác với chỉ nhìn COUNT trong database.
-- `modeling.py`: feature, mẫu xác định, cách chia tập, preprocessing và đánh giá chung.
-- `train_risk_model.py`: thử baseline/alternative, chọn trên validation, final fit, lưu artifact. Không cần gọi mỗi lần mở dashboard.
-- `predict_risk_batch.py`: load artifact và chấm held-out, ghi prediction qua một batch SQL.
-- `run_synthetic_cdc_demo.py`: demo thay đổi có kiểm soát, tách khỏi bảng nguồn thật.
-- `airflow_dag.py`: mô tả thứ tự hai nhánh Airflow và cách lỗi DQ chặn consumer.
-- `validate_repo.py`: kiểm tĩnh layout, syntax, link và định dạng snapshot. Không thay thế chạy SQL hay trình duyệt.
+- `load_market.py`, `load_risk.py`: đọc CSV theo contract, chuyển kiểu và nạp từng batch.
+- `profile_market.py`, `profile_risk.py`: thống kê nguồn bằng luồng đọc và vùng làm việc tạm; không load toàn bộ vào RAM.
+- `profile_precision.py`: kiểm riêng chữ số phần nguyên/phần thập phân để chọn kiểu SQL đúng.
+- `reconcile_market.py`: đọc lại raw, đối chiếu staging/fact và tổng measure. Khác với chỉ nhìn COUNT trong database.
+- `model.py`: feature, mẫu xác định, cách chia tập, preprocessing và đánh giá chung.
+- `train_risk.py`: thử baseline/alternative, chọn trên validation, final fit, lưu artifact. Không cần gọi mỗi lần mở dashboard.
+- `score_risk.py`: load artifact và chấm held-out, ghi prediction qua một batch SQL.
+- `cdc_demo.py`: demo thay đổi có kiểm soát, tách khỏi bảng nguồn thật.
+- `dag.py`: mô tả thứ tự hai nhánh Airflow và cách lỗi DQ chặn consumer.
+- `validate.py`: kiểm tĩnh layout, syntax, link và định dạng snapshot. Không thay thế chạy SQL hay trình duyệt.
 
 `docs/`, `reports/`, `log/`, `powerbi/`, `notebooks/`, `scripts/`, `ml/`, `dags/`, `airflow/`, `sql/` cũ đã được gom hoặc thay thế. Không cần tìm một tài liệu hướng dẫn thứ hai trong các thư mục đó.
+
+Các file Python trong `pipeline/` được giữ tách theo một việc chính để dễ đọc: `load_*` nạp nguồn, `profile_*` khảo sát nguồn, `model/train/score` xử lý ML, `dag` điều phối và `manage` làm cửa vào lệnh. Tên file đã rút gọn nhưng vẫn nói đúng chức năng; không gộp toàn bộ code vào một file lớn vì như vậy khó học và khó kiểm tra hơn.
 
 ## 4. Docker thực sự lưu gì?
 
@@ -176,6 +178,17 @@ Copy-Item .env.example .env
 
 Sửa `.env`: đặt `SQLSERVER_SA_PASSWORD` đủ độ phức tạp và `AIRFLOW_SECRET_KEY` dài, ngẫu nhiên nếu dùng Airflow. Không ghi secret vào README hoặc Git. Nếu database volume đã có, dùng đúng mật khẩu đã đặt ban đầu; đổi biến môi trường không tự đổi mật khẩu `sa` trong database hiện hữu.
 
+`.env` có thể ít dòng hơn `.env.example` và đó là bình thường. File example liệt kê cả biến có giá trị mặc định để người mới biết hệ thống hỗ trợ gì; `config.py` tự dùng `localhost,1433`, `DWH_Insurance` và user `sa` khi ba biến tương ứng không có trong `.env`. Trên máy của bạn, `.env` hiện chỉ cần `SQLSERVER_SA_PASSWORD` để kết nối SQL Server local. Nếu muốn nhìn hai file giống nhau, tự mở `.env` và thêm:
+
+```dotenv
+SQLSERVER_HOST=localhost,1433
+SQLSERVER_DATABASE=DWH_Insurance
+SQLSERVER_USER=sa
+AIRFLOW_SECRET_KEY=đặt_một_chuỗi_dài_ngẫu_nhiên
+```
+
+Không copy nguyên `.env.example` đè lên `.env` sau khi đã đặt mật khẩu. `.env.example` được phép push vì không có secret; `.env` luôn bị Git bỏ qua.
+
 ```powershell
 docker compose up -d sqlserver
 docker compose logs --tail 30 sqlserver
@@ -196,12 +209,12 @@ data/raw/brvehins1/brvehins1e.csv
 ```
 
 ```powershell
-.venv\Scripts\python.exe pipeline/validate_repo.py --raw
+.venv\Scripts\python.exe pipeline/validate.py --raw
 .venv\Scripts\python.exe pipeline/manage.py load-market
 .venv\Scripts\python.exe pipeline/manage.py load-risk
 .venv\Scripts\python.exe pipeline/manage.py quality
 .venv\Scripts\python.exe pipeline/manage.py status
-.venv\Scripts\python.exe pipeline/reconcile_susep_source_to_fact.py
+.venv\Scripts\python.exe pipeline/reconcile_market.py
 ```
 
 Nạp lần đầu có thể lâu vì hơn 10 triệu dòng và index. Loader không phải lệnh xóa/nạp lại toàn bộ. Cùng source đã SUCCESS sẽ SKIPPED. Nếu nguồn thay phiên bản, phải kiểm contract và chính sách thay thế trước; không coi đây là xử lý schema drift tự động.
@@ -218,7 +231,7 @@ Máy hiện tại đã có artifact trong `data/models/`; có thể chấm lại
 Clone mới không mang theo model binary. Khi cần tự tái tạo model và đã load Track B, mới chạy:
 
 ```powershell
-.venv\Scripts\python.exe pipeline/train_risk_model.py
+.venv\Scripts\python.exe pipeline/train_risk.py
 .venv\Scripts\python.exe pipeline/manage.py score
 .venv\Scripts\python.exe pipeline/manage.py export
 ```
@@ -234,6 +247,31 @@ docker compose --profile analytics up -d --build dashboard
 Container dùng Gunicorn để phục vụ Dash. Không chạy đồng thời app Python và container trên port 8050. Python local là cách nhanh nhất để xem snapshot, còn Compose đọc cấu hình secret SQL chung từ `.env` ngay cả khi chỉ khởi động dashboard.
 
 ### 5.5 Bật Airflow khi cần điều phối
+
+Airflow không chứa dữ liệu bảo hiểm. Nó là người điều phối: gọi loader, gọi procedure SQL, chờ các bước trước hoàn tất, rồi gọi DQ/scoring. SQL Server mới là nơi giữ staging, dimension, fact, DQ log và prediction. Vì vậy có thể xóa container Airflow mà dữ liệu SQL vẫn còn trong volume `sqlserver_data`; xóa volume SQL mới làm mất database.
+
+Luồng dễ nhớ:
+
+```text
+Airflow start
+  ├─ Track A: load CSV → SQL DWH → đối soát → quality gate
+  └─ Track B: kiểm foundation → quality gate → score model → kiểm predictions
+```
+
+Mỗi ô trong DAG là một task. Mũi tên nghĩa là task sau chỉ chạy khi task trước thành công. DAG hiện đặt `schedule=None`, nên không tự chạy theo giờ; bạn phải bật Airflow, mở UI ở `http://127.0.0.1:8080`, bật DAG `insurance_data_platform` và bấm Trigger. Lần đầu cần nạp/migrate SQL và chuẩn bị model trước; DAG không tự tạo dữ liệu, không tự train model và không tự sửa lỗi DQ.
+
+Lệnh quản lý cơ bản:
+
+```powershell
+docker compose --profile orchestration up -d --build airflow
+docker compose --profile orchestration logs --tail 80 airflow
+docker compose exec airflow airflow dags list
+docker compose exec airflow airflow dags unpause insurance_data_platform
+```
+
+`airflow dags test` dùng để kiểm tra một lần trên máy, còn Trigger trong UI tạo một run được lưu trong metadata volume. Mở task log để biết task nào lỗi; sửa nguyên nhân rồi chạy lại. Nếu DQ A lỗi thì nhánh A dừng ở quality gate, còn nhánh B vẫn có thể tiếp tục vì hai nhánh không phụ thuộc nhau.
+
+SQL Server có ba lớp bạn cần phân biệt: Docker container là chương trình SQL đang chạy; named volume `sqlserver_data` là ổ đĩa chứa database; thư mục `database/migrations` chỉ là các file lệnh tạo/cập nhật schema. Khi chạy `pipeline/manage.py migrate`, Python gửi lần lượt V1–V14 vào SQL Server và ghi version đã chạy vào `meta.SchemaVersion`. Khi chạy `load-market` hoặc `load-risk`, Python đọc CSV rồi ghi staging; stored procedure trong SQL Server nạp dimension/fact. Airflow chỉ gọi lại các bước đó theo thứ tự.
 
 ```powershell
 docker compose --profile orchestration up -d --build airflow
@@ -363,7 +401,7 @@ Demo tạo insert, update-before/update-after rồi insert; capture được 4 c
 Muốn học demo sau migration V9 và SQL Agent đang chạy:
 
 ```powershell
-.venv\Scripts\python.exe pipeline/run_synthetic_cdc_demo.py
+.venv\Scripts\python.exe pipeline/cdc_demo.py
 ```
 
 Lệnh này tạo dữ liệu demo có chủ đích trong schema `meta`; không phải bước bắt buộc khi mở dashboard.
@@ -454,7 +492,7 @@ Mở [database/performance.sql](database/performance.sql) trong SSMS/Azure Data 
 
 ```powershell
 .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
-.venv\Scripts\python.exe pipeline/validate_repo.py
+.venv\Scripts\python.exe pipeline/validate.py
 .venv\Scripts\python.exe -m unittest discover -s tests -p test_*.py
 docker compose --profile analytics --profile orchestration config -q
 git diff --check
@@ -491,7 +529,7 @@ Nó mở ba trang, đổi state/year, kiểm nội dung CSV, health endpoint và
 2. Đọc header và contract mục 6, mở loader. Tự tìm nơi chuyển kiểu, SHA-256, batch và reject. Giải thích vì sao không tạo policy key.
 3. Đọc V6/V7 và V11/V12. Viết SELECT join fact-dim, GROUP BY theo tháng/state. Giải thích grain trước khi nói measure.
 4. Đọc quality gates V8/V13 và code drain result set. Phân biệt warning/hard failure và chạy lại không duplicate.
-5. Đọc modeling/train/predict. Tự giải thích leakage, split group, AP và confusion matrix. Không cần học thuộc toàn sklearn.
+5. Đọc model/train_risk/score_risk. Tự giải thích leakage, split group, AP và confusion matrix. Không cần học thuộc toàn sklearn.
 6. Đọc V14/performance.sql, đọc DAG. Giải thích index có chi phí, task phụ thuộc và lỗi A không chặn B.
 7. Mở dashboard, demo filter/CSV, kể quyết định và giới hạn. Luyện trả lời các câu dưới bằng file và bằng chứng thật.
 

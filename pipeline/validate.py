@@ -39,8 +39,8 @@ def validate(raw: bool = False) -> None:
             if not spec["rows"] or any(len(row) != len(spec["columns"]) for row in spec["rows"]):
                 raise ValueError(f"Invalid snapshot table: {section}.{name}")
     if raw:
-        from load_susep_to_staging import SOURCE_COLUMNS as MARKET_COLUMNS
-        from load_brvehins1_to_staging import SOURCE_COLUMNS as RISK_COLUMNS
+        from load_market import SOURCE_COLUMNS as MARKET_COLUMNS
+        from load_risk import SOURCE_COLUMNS as RISK_COLUMNS
         files = [(ROOT / "data/raw/susep.gov.br/insurance_dataset.csv", MARKET_COLUMNS)]
         files += [(ROOT / f"data/raw/brvehins1/brvehins1{s}.csv", RISK_COLUMNS) for s in "abcde"]
         for path, expected in files:

@@ -12,7 +12,7 @@ from time import perf_counter
 import joblib
 import pyodbc
 
-from modeling import (
+from model import (
     MODEL_FEATURES,
     REPO_ROOT,
     assign_splits,

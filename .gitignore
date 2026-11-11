@@ -13,9 +13,7 @@ htmlcov/
 data/raw/*
 !data/raw/.gitkeep
 data/models/*
-!data/models/.gitkeep
 data/generated/*
-!data/generated/.gitkeep
 # Temporary runtime output and local editor settings
 .tmp-*
 *.log

@@ -16,7 +16,7 @@ from sklearn.dummy import DummyClassifier
 from sklearn.linear_model import SGDClassifier
 from sklearn.naive_bayes import ComplementNB
 
-from modeling import (
+from model import (
     DATA_CONTRACT_REFERENCE,
     MODEL_FEATURES,
     PROGRESSIVE_TRAIN_CAPS,

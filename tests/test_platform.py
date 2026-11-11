@@ -74,7 +74,9 @@ class PlatformTests(unittest.TestCase):
         self.assertAlmostEqual(comparison["premium_change"], -25)
         self.assertAlmostEqual(comparison["ratio_change_pp"], 30)
         self.assertIn("negative", market_change(comparison, "premium_change").children[0].className)
-        self.assertIn("negative", market_change(comparison, "ratio_change_pp", lower_is_better=True).children[0].className)
+        self.assertIn("positive", market_change(comparison, "ratio_change_pp", lower_is_better=True).children[0].className)
+        self.assertIn("▼", market_change(comparison, "premium_change").children[0].children)
+        self.assertIn("▲", market_change({"ratio_change_pp": 1.7, "period": "2023 vs 2022"}, "ratio_change_pp", lower_is_better=True).children[0].children)
         with patch("dashboard.data.table", return_value=previous.iloc[[0]]):
             self.assertEqual(latest_market_comparison(current, "SP"), {})
         self.assertEqual(latest_market_comparison(current.iloc[:0], "SP"), {})
@@ -125,12 +127,14 @@ class PlatformTests(unittest.TestCase):
             self.assertEqual(sum(row[0] for row in age.data[0].customdata), segments.observations.sum())
             self.assertEqual(sum(row[1] for row in age.data[0].customdata), segments.has_claim.sum())
 
-    def test_benchmark_encodes_actual_reads_from_zero(self):
-        benchmark = platform_page()[-1].children[1].children[0].children.figure
-        self.assertEqual(benchmark.layout.xaxis.type, "linear")
-        self.assertEqual(benchmark.layout.xaxis.range[0], 0)
-        for series, field in zip(benchmark.data, ("before_reads", "after_reads")):
-            self.assertEqual(list(series.x), [row[field] for row in snapshot()["performance"]])
+    def test_benchmark_preserves_before_after_and_reduction(self):
+        cards = platform_page()[-1].children[2].children
+        for card, row in zip(cards, snapshot()["performance"]):
+            before, _, after = card.children[1].children
+            self.assertEqual(before.children[1].children, f"{row['before_reads']:,}")
+            self.assertEqual(after.children[1].children, f"{row['after_reads']:,}")
+            expected = 100 * (1 - row["after_reads"] / row["before_reads"])
+            self.assertEqual(card.children[2].children[0].children, f"{expected:.2f}%")
 
     def test_ranking_shares_use_all_premiums_not_only_top_n(self):
         result = update_market("SP", [2018, 2020])

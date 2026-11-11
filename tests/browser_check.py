@@ -37,7 +37,8 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         assert page.locator("#market-trend .main-svg").count() > 0
         assert page.locator("#market-trend").bounding_box()["height"] >= 290
         assert page.locator(".sidebar-data, .reading-note, .scope-note, .workspace footer").count() == 0
-        assert page.locator("#market-metrics .metric-change.positive").count() == 2
+        expect(page.locator("#market-metrics .metric-change.positive")).to_contain_text("▲ +8.9%")
+        expect(page.locator("#market-metrics .metric-change.negative")).to_contain_text("▼ -4.9 pp")
         expect(page.locator("#market-metrics")).to_contain_text("Jan–Jul 2023 vs 2022")
         assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticklabelstandoff") == 18
         assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticktext.every(t => !t.includes('<br>'))")
@@ -59,7 +60,7 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         page.locator("#market-state input").fill("SP")
         page.get_by_text("SP · São Paulo", exact=True).click()
         expect(page.locator("#market-metrics")).to_contain_text("SP")
-        expect(page.locator("#market-metrics .metric-change.negative")).to_contain_text("+1.7 pp")
+        expect(page.locator("#market-metrics .metric-change.positive").filter(has_text="+1.7 pp")).to_contain_text("▲ +1.7 pp")
         assert before != page.locator("#market-metrics").inner_text()
         handle = page.locator("#market-years .rc-slider-handle-1")
         position = handle.bounding_box()
@@ -103,7 +104,7 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         page.locator("#section label").filter(has_text=labels[2]).click()
         page.get_by_role("heading", name="See the data behind the platform", exact=True).wait_for()
         expect(page.locator("#data-count")).to_have_text("6,669 aggregate rows")
-        page.wait_for_function("document.querySelector('.benchmark-card .js-plotly-plot')?.data?.length === 2")
+        expect(page.locator(".benchmark-query")).to_have_count(2)
         page.wait_for_load_state("networkidle")
         assert page.locator("#data-table tbody tr").count() == 15
         expect(page.locator("#data-table tbody tr").first).to_contain_text("2023-07")
@@ -128,8 +129,10 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         }""")
         assert page.locator("#data-prev").is_disabled()
         expect(page.locator(".benchmark-card")).to_contain_text("24 September 2026")
-        assert page.evaluate("document.querySelector('.benchmark-card .js-plotly-plot').layout.xaxis.type") == "linear"
-        assert page.evaluate("document.querySelector('.benchmark-card .js-plotly-plot').layout.xaxis.range[0]") == 0
+        expect(page.locator("#benchmark-query-1")).to_contain_text("Company by month")
+        expect(page.locator("#benchmark-query-1")).to_contain_text("317,528")
+        expect(page.locator("#benchmark-query-1")).to_contain_text("3,364")
+        expect(page.locator("#benchmark-query-2")).to_contain_text("3,734")
         page.locator("#data-state input").fill("All states")
         page.locator("#data-state .VirtualizedSelectOption").filter(has_text="All states").click()
         page.locator("#data-track label").filter(has_text="SUSEP market").click()
@@ -151,7 +154,10 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
             for label, title in zip(labels, ("Insurance market overview", "Motor risk & model insights", "See the data behind the platform")):
                 page.locator("#section label").filter(has_text=label).click()
                 page.get_by_role("heading", name=title, exact=True).wait_for()
-                page.locator(".chart .main-svg").first.wait_for()
+                if label == "Data":
+                    page.locator("#benchmark-query-1").wait_for()
+                else:
+                    page.locator(".chart .main-svg").first.wait_for()
                 page.wait_for_function("!document.querySelector('[data-dash-is-loading=true]')")
                 page.wait_for_function("""() => [...document.querySelectorAll('.js-plotly-plot')].every(
                     el => el.data?.length && el._fullLayout && Math.abs(el._fullLayout.width - el.getBoundingClientRect().width) < 2
@@ -181,7 +187,7 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         assert not errors, errors
         assert page.request.get(base_url + "/healthz").json()["status"] == "ok"
         browser.close()
-    print("PASS: 3 English pages; population grouping; monthly/annual totals; geography/year filters; resets; CSV/PNG exports; hover; histogram width; zero-baseline SQL bars; fixed historical metrics; 5 widths; local font; health; no browser/HTTP errors.")
+    print("PASS: 3 English pages; population grouping; monthly/annual totals; geography/year filters; resets; CSV/PNG exports; hover; histogram width; before/after SQL reads; fixed historical metrics; 5 widths; local font; health; no browser/HTTP errors.")
 
 
 if __name__ == "__main__":

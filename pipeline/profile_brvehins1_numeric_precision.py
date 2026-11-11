@@ -39,7 +39,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument(
         "--output",
         type=Path,
-        default=Path("reports/data/brvehins1-numeric-precision.json"),
+        default=Path("data/generated/brvehins1-numeric-precision.json"),
     )
     return parser.parse_args()
 

@@ -18,6 +18,7 @@ import uuid
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Iterable
+import config  # Loads the repository .env before reading connection options.
 
 try:
     import pyodbc

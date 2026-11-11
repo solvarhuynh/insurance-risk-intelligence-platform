@@ -12,6 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pyodbc
+import config
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
@@ -28,7 +29,7 @@ def parse_arguments() -> argparse.Namespace:
     parser.add_argument("--password-env", default="SQLSERVER_SA_PASSWORD")
     parser.add_argument("--consumer", default=DEFAULT_CONSUMER)
     parser.add_argument("--timeout-seconds", type=int, default=60)
-    parser.add_argument("--output", type=Path, default=Path("reports/data/p1-inc-02-cdc-demo.json"))
+    parser.add_argument("--output", type=Path, default=Path("data/generated/p1-inc-02-cdc-demo.json"))
     return parser.parse_args()
 
 

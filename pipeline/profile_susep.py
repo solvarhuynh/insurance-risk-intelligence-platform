@@ -19,7 +19,7 @@ from typing import Any, Iterable
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_SOURCE = REPO_ROOT / "data" / "raw" / "susep.gov.br" / "insurance_dataset.csv"
-OUTPUT_DIR = REPO_ROOT / "reports" / "data"
+OUTPUT_DIR = REPO_ROOT / "data" / "generated"
 SOURCE_COLUMNS = (
     "company_code", "company_name", "year_month", "product",
     "state", "premiums", "claims", "claim_premium_ratio",
@@ -451,7 +451,7 @@ def parse_arguments() -> argparse.Namespace:
 
 
 def main() -> int:
-    """Run profiling and write reports/data evidence."""
+    """Run profiling and write local profiling evidence."""
     args = parse_arguments()
     try:
         result = profile(args.source.resolve(), args.batch_size)

@@ -26,7 +26,7 @@ import pandas as pd
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
 RAW_DIR = REPO_ROOT / "data" / "raw" / "brvehins1"
-OUTPUT_DIR = REPO_ROOT / "reports" / "data"
+OUTPUT_DIR = REPO_ROOT / "data" / "generated"
 PARTITIONS = (
     "brvehins1a.csv",
     "brvehins1b.csv",

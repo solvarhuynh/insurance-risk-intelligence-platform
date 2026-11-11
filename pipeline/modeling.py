@@ -19,6 +19,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 import pyodbc
+from config import connection_string
 from sklearn.compose import ColumnTransformer
 from sklearn.impute import SimpleImputer
 from sklearn.metrics import (
@@ -41,7 +42,7 @@ MODEL_FEATURES = [
     "Gender", "DrivAge", "VehYear", "VehModel", "VehGroup", "Area", "StateAb"
 ]
 IDENTITY_COLUMNS = ["SourceFile", "SourceRowNumber", "SourceRecordHash"]
-DATA_CONTRACT_REFERENCE = "docs/ml/ml-data-contract.md"
+DATA_CONTRACT_REFERENCE = "GUIDE.md"
 
 # 100k is intentionally below both the prior all-DWH materialisation and the
 # 300k bounded attempt, which reached about 0.92 GB working set before the
@@ -88,18 +89,6 @@ WHERE (selected_group.HasClaim = 1 AND selected_group.HashRank <= ?)
    OR (selected_group.HasClaim = 0 AND selected_group.HashRank <= ?)
 ORDER BY f.SourceRecordHash, f.SourceFile, f.SourceRowNumber;
 """
-
-
-def connection_string() -> str:
-    password = os.environ.get("SQLSERVER_SA_PASSWORD")
-    if not password:
-        raise RuntimeError("Thiếu biến môi trường SQLSERVER_SA_PASSWORD cho ML extraction.")
-    server = os.environ.get("SQLSERVER_HOST", "localhost,1433")
-    return (
-        f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={server};"
-        "DATABASE=DWH_Insurance;UID=sa;PWD=" + password + ";"
-        "Encrypt=no;TrustServerCertificate=yes;Connection Timeout=30;"
-    )
 
 
 def extract_bounded_population() -> pd.DataFrame:

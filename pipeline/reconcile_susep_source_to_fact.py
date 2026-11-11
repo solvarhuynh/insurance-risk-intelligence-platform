@@ -11,6 +11,7 @@ from decimal import Decimal, localcontext
 from pathlib import Path
 
 import pyodbc
+import config
 
 from load_susep_to_staging import (
     SOURCE_COLUMNS,

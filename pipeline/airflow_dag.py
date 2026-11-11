@@ -2,32 +2,26 @@
 
 from __future__ import annotations
 
-import os
 import subprocess
 import sys
+import uuid
+import json
 from datetime import datetime, timedelta
 from pathlib import Path
 
-import pyodbc
 from airflow import DAG
 from airflow.operators.empty import EmptyOperator
 from airflow.operators.python import PythonOperator
 
 
 PROJECT = Path("/opt/airflow/project")
-RAW_SUSEP = Path("/opt/airflow/raw_data/susep.gov.br/insurance_dataset.csv")
-SUSEP_LOADER = PROJECT / "scripts" / "load_susep_to_staging.py"
-SUSEP_RECONCILER = PROJECT / "scripts" / "reconcile_susep_source_to_fact.py"
-RISK_SCORER = PROJECT / "ml" / "predict_risk_batch.py"
+sys.path.insert(0, str(PROJECT / "pipeline"))
+from config import connect
+RAW_SUSEP = PROJECT / "data/raw/susep.gov.br/insurance_dataset.csv"
+SUSEP_LOADER = PROJECT / "pipeline" / "load_susep_to_staging.py"
+SUSEP_RECONCILER = PROJECT / "pipeline" / "reconcile_susep_source_to_fact.py"
+RISK_SCORER = PROJECT / "pipeline" / "predict_risk_batch.py"
 RISK_POPULATION = "bounded_held_out_test"
-
-
-def connect() -> pyodbc.Connection:
-    password = os.environ["SQLSERVER_SA_PASSWORD"]
-    return pyodbc.connect(
-        "DRIVER={ODBC Driver 18 for SQL Server};SERVER=sqlserver,1433;"
-        "DATABASE=DWH_Insurance;UID=sa;PWD=" + password + ";Encrypt=no;TrustServerCertificate=yes;"
-    )
 
 
 def run_python(path: Path, *arguments: str) -> None:
@@ -102,16 +96,19 @@ def track_b_quality_gate(**context) -> None:
 
 
 def track_b_batch_score(**context) -> None:
-    run_python(RISK_SCORER, "--run-id", str(context["run_id"]))
+    # Airflow IDs such as manual__2026-11-11 need a stable UUID for SQL lineage.
+    scoring_id = uuid.uuid5(uuid.NAMESPACE_URL, "insurance_data_platform/" + str(context["run_id"]))
+    run_python(RISK_SCORER, "--run-id", str(scoring_id))
 
 
 def track_b_validate_predictions(**_) -> None:
+    metadata = json.loads((PROJECT / "data/models/claim_risk_model_v001.metadata.json").read_text(encoding="utf-8"))
     with connect() as connection:
         row = connection.execute(
-            "SELECT COUNT_BIG(*),COUNT(DISTINCT SourceFile+N':'+CONVERT(nvarchar(20),SourceRowNumber)) FROM dwh.RiskObservationPrediction WHERE ScoringPopulation=?;",
-            RISK_POPULATION,
+            "SELECT COUNT_BIG(*),COUNT(DISTINCT SourceFile+N':'+CONVERT(nvarchar(20),SourceRowNumber)) FROM dwh.RiskObservationPrediction WHERE ScoringPopulation=? AND ModelVersion=?;",
+            RISK_POPULATION, metadata["model_version"],
         ).fetchone()
-    if row[0] != row[1] or row[0] == 0:
+    if row[0] != row[1] or row[0] != metadata["test_rows"]:
         raise RuntimeError(f"Track B prediction reconciliation failed: rows={row[0]}, distinct_identity={row[1]}")
     print(f"Track B prediction reconciliation PASS: rows={row[0]}")
 
@@ -120,7 +117,7 @@ with DAG(
     dag_id="insurance_data_platform",
     description="Independent SUSEP market and brvehins1 risk/ML flows; no cross-track data join",
     start_date=datetime(2026, 1, 1), schedule=None, catchup=False,
-    default_args={"owner": "data_engineering_team", "retries": 1, "retry_delay": timedelta(minutes=1)},
+    default_args={"owner": "personal_project", "retries": 1, "retry_delay": timedelta(minutes=1)},
     tags=["insurance-platform", "track-a-susep", "track-b-brvehins1", "dq", "ml"],
 ) as dag:
     start = EmptyOperator(task_id="platform_start")

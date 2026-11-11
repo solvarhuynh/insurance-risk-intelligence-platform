@@ -79,8 +79,8 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Score bounded held-out brvehins1 observations.")
     parser.add_argument("--run-id", type=uuid.UUID, default=uuid.uuid4())
     args = parser.parse_args()
-    artifact_path = REPO_ROOT / "ml/artifacts" / f"{MODEL_VERSION}.joblib"
-    metadata_path = REPO_ROOT / "ml/artifacts" / f"{MODEL_VERSION}.metadata.json"
+    artifact_path = REPO_ROOT / "data/models" / f"{MODEL_VERSION}.joblib"
+    metadata_path = REPO_ROOT / "data/models" / f"{MODEL_VERSION}.metadata.json"
     metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
     if metadata["model_version"] != MODEL_VERSION:
         raise RuntimeError("Artifact metadata không khớp model version của scorer.")

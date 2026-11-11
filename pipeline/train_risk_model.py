@@ -88,7 +88,7 @@ def main() -> None:
         metrics["progressive_cap_requested"] = cap
         progressive.append(metrics)
     write_json(
-        "reports/data/p1-ml-resource-scaling.json",
+        "data/generated/p1-ml-resource-scaling.json",
         {
             "timestamp_utc": utc_now(),
             "extraction_and_split_seconds": round(extraction_seconds, 6),
@@ -108,7 +108,7 @@ def main() -> None:
         "complement_nb", ComplementNB(alpha=1.0), final_train_for_selection, validation
     )
     write_json(
-        "reports/data/p1-ml-baseline-metrics.json",
+        "data/generated/p1-ml-baseline-metrics.json",
         {"majority_dummy": dummy_metrics, "sgd_logistic_baseline": baseline_metrics},
     )
     comparison = {
@@ -130,7 +130,7 @@ def main() -> None:
         "selected_model": selected_name,
         "criteria": "validation Average Precision, then validation ROC-AUC, then linear logistic-loss interpretability",
     }
-    write_json("reports/data/p1-ml-model-comparison.json", comparison)
+    write_json("data/generated/p1-ml-model-comparison.json", comparison)
 
     # Final fit uses a deterministic group-complete cap from train+validation.
     train_validation = pd.concat([train, validation], ignore_index=True)
@@ -142,8 +142,9 @@ def main() -> None:
     final_training_seconds = perf_counter() - final_started
     test_metrics = evaluate(final_pipeline, test, "held_out_test")
 
-    artifact_path = REPO_ROOT / "ml/artifacts" / f"{MODEL_VERSION}.joblib"
-    metadata_path = REPO_ROOT / "ml/artifacts" / f"{MODEL_VERSION}.metadata.json"
+    artifact_path = REPO_ROOT / "data/models" / f"{MODEL_VERSION}.joblib"
+    artifact_path.parent.mkdir(parents=True, exist_ok=True)
+    metadata_path = REPO_ROOT / "data/models" / f"{MODEL_VERSION}.metadata.json"
     joblib.dump(final_pipeline, artifact_path)
     reloaded = joblib.load(artifact_path)
     reload_sample = test.sort_values(["SourceRecordHash", "SourceFile", "SourceRowNumber"]).head(100)
@@ -183,8 +184,8 @@ def main() -> None:
         "artifact_reload_test": {"rows_scored": int(len(reload_sample)), "probabilities_identical": True, "probability_min": float(reloaded_probabilities.min()), "probability_max": float(reloaded_probabilities.max())},
     }
     metadata_path.write_text(__import__("json").dumps(metadata, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    write_json("reports/data/p1-ml-bounded-dataset-summary.json", summary)
-    write_json("reports/data/p1-ml-final-model.json", metadata)
+    write_json("data/generated/p1-ml-bounded-dataset-summary.json", summary)
+    write_json("data/generated/p1-ml-final-model.json", metadata)
     print(
         f"Selected={selected_name}; artifact={artifact_path.name}; "
         f"test_AP={test_metrics['average_precision']:.6f}; test_ROC_AUC={test_metrics['roc_auc']:.6f}; "

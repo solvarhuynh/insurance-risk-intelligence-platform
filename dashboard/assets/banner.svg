@@ -1,55 +1,61 @@
-<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" width="1280" height="340" viewBox="0 0 1280 340" role="img" aria-labelledby="title desc">
-  <title id="title">Insurance Data Platform</title>
-  <desc id="desc">Personal data engineering project with a compass pointing to insurance risk. Built with Python, SQL Server, Airflow, Docker and machine learning.</desc>
-  <defs>
-    <linearGradient id="bannerBg" x2="1" y2=".7"><stop stop-color="#122736"/><stop offset="1" stop-color="#1c454c"/></linearGradient>
-    <linearGradient id="panelBg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#f5f5ef"/><stop offset=".56" stop-color="#e7efec"/><stop offset="1" stop-color="#cbdde0"/></linearGradient>
-    <radialGradient id="dial" cx="50%" cy="46%" r="62%"><stop stop-color="#fafaf5"/><stop offset=".8" stop-color="#d7e4e4"/><stop offset="1" stop-color="#92aaae"/></radialGradient>
-    <linearGradient id="steel" x1="0" y1="0" x2=".9" y2="1"><stop stop-color="#4d676f"/><stop offset=".35" stop-color="#e1ebea"/><stop offset=".68" stop-color="#728d94"/><stop offset="1" stop-color="#283f4a"/></linearGradient>
-    <linearGradient id="pointer" x1="0" y1="1" x2="1" y2="0"><stop stop-color="#187aa4"/><stop offset="1" stop-color="#4eaae5"/></linearGradient>
-    <pattern id="grid" width="33" height="33" patternUnits="userSpaceOnUse"><path d="M33 0H0V33" fill="none" stroke="#99c6bc" stroke-opacity=".06"/></pattern>
-    <clipPath id="panelClip"><rect x="731" y="26" width="517" height="288" rx="14"/></clipPath>
-    <path id="insuranceArc" d="M875 185 A126 126 0 0 1 1127 185"/>
-    <filter id="shadow" x="-40%" y="-40%" width="180%" height="180%"><feDropShadow dx="0" dy="5" stdDeviation="6" flood-color="#193845" flood-opacity=".25"/></filter>
-  </defs>
-
-  <rect width="1280" height="340" rx="20" fill="url(#bannerBg)"/>
-  <rect width="1280" height="340" rx="20" fill="url(#grid)"/>
-
-  <rect x="57" y="75" width="5" height="23" rx="2.5" fill="#88d0c5"/>
-  <g font-family="Segoe UI,Arial,sans-serif">
-    <text x="78" y="92" font-size="12" letter-spacing="2.8" fill="#a6d7cf">PERSONAL DATA ENGINEERING PROJECT</text>
-    <text x="56" y="166" font-size="46" font-weight="700" letter-spacing="-1" fill="#f7faf8">Insurance Data Platform</text>
-    <path d="M57 190H662" stroke="#a5cac4" stroke-opacity=".26"/>
-    <text x="57" y="224" font-size="13" letter-spacing="1" fill="#a9c9c8">PYTHON  /  SQL SERVER  /  AIRFLOW  /  DOCKER  /  MACHINE LEARNING</text>
-  </g>
-
-  <g clip-path="url(#panelClip)">
-    <rect x="731" y="26" width="517" height="288" fill="url(#panelBg)"/>
-    <circle cx="1001" cy="190" r="180" fill="url(#dial)" opacity=".56"/>
-    <circle cx="1001" cy="190" r="159" fill="none" stroke="#748f94" stroke-width="1" stroke-opacity=".48"/>
-    <circle cx="1001" cy="190" r="151" fill="none" stroke="#fff" stroke-width="7" stroke-opacity=".65"/>
-    <circle cx="1001" cy="190" r="146" fill="none" stroke="#38515c" stroke-width="7" stroke-dasharray="1 8.56" stroke-opacity=".38"/>
-    <circle cx="1001" cy="190" r="134" fill="none" stroke="#8da4a6" stroke-width="1.3" stroke-opacity=".7"/>
-    <circle cx="1001" cy="190" r="126" fill="none" stroke="#f7faf7" stroke-width="2" stroke-opacity=".75"/>
-    <text fill="#3c8fc3" font-family="Segoe UI,Arial,sans-serif" font-size="30" font-weight="750" letter-spacing="3.2">
-      <textPath href="#insuranceArc" xlink:href="#insuranceArc" startOffset="50%" text-anchor="middle">INSURANCE</textPath>
-    </text>
-    <text x="1216" y="174" transform="rotate(90 1216 174)" font-family="Segoe UI,Arial,sans-serif" font-size="22" font-weight="700" letter-spacing="4" fill="#536b72" opacity=".31">RISK</text>
-    <g transform="translate(971 213)" opacity=".48">
-      <path d="M0-95L14-24 0-8-14-24ZM95 0L24 14 8 0 24-14ZM0 95L-14 24 0 8 14 24ZM-95 0L-24-14-8 0-24 14Z" fill="#324b54"/>
-      <path d="M-66-66L-10-22-2-2-22-10ZM66-66L22-10 2-2 10-22ZM66 66L10 22 2 2 22 10ZM-66 66L-22 10-2 2-10 22Z" fill="#647b7f"/>
-      <circle r="40" fill="none" stroke="#425e65" stroke-width="1.5"/>
-    </g>
-    <g filter="url(#shadow)">
-      <path d="M918 275L1088 102 1100 114 930 287Z" fill="url(#steel)"/>
-      <path d="M941 259L1085 114" fill="none" stroke="#f8ffff" stroke-width="2" opacity=".75"/>
-      <path d="M1080 102L1131 70 1105 128 1096 112 1084 116Z" fill="url(#pointer)"/>
-      <path d="M1080 102L1131 70 1096 112Z" fill="#74c4eb" opacity=".6"/>
-      <circle cx="971" cy="213" r="24" fill="url(#steel)" stroke="#f7f9f4" stroke-width="3"/>
-      <circle cx="971" cy="213" r="15" fill="#4e8091" stroke="#cce6e7" stroke-width="2"/>
-      <circle cx="971" cy="213" r="7" fill="#e9f3f0"/>
-    </g>
-  </g>
-  <rect x="731.5" y="26.5" width="516" height="287" rx="14" fill="none" stroke="#b0d1ce" stroke-opacity=".55"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="360" viewBox="0 0 1280 360" role="img" aria-labelledby="title desc">
+<title id="title">Insurance Data Platform — Data Engineering and Risk Intelligence</title>
+<desc id="desc">Modern dark banner for an insurance data engineering project using Python, SQL Server, Apache Airflow, Docker and machine learning, with a data pipeline and risk analytics illustration.</desc>
+<defs>
+ <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#091424"/><stop offset=".55" stop-color="#10243C"/><stop offset="1" stop-color="#102F41"/></linearGradient>
+ <radialGradient id="glow" cx="75%" cy="40%" r="55%"><stop stop-color="#1A6680" stop-opacity=".29"/><stop offset="1" stop-color="#0A1B2B" stop-opacity="0"/></radialGradient>
+ <linearGradient id="accent" x1="0" x2="1"><stop stop-color="#65E0D1"/><stop offset="1" stop-color="#6BB8F7"/></linearGradient>
+ <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1D3D52"/><stop offset="1" stop-color="#142C43"/></linearGradient>
+ <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%"><feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#000A14" flood-opacity=".4"/></filter>
+ <pattern id="dots" width="25" height="25" patternUnits="userSpaceOnUse"><circle cx="2" cy="2" r="1" fill="#A1E8E5" opacity=".12"/></pattern>
+ <clipPath id="rounded"><rect width="1280" height="360" rx="22"/></clipPath>
+</defs>
+<g clip-path="url(#rounded)">
+ <rect width="1280" height="360" fill="url(#bg)"/>
+ <rect width="1280" height="360" fill="url(#glow)"/>
+ <rect x="710" y="0" width="570" height="360" fill="url(#dots)"/>
+ <path d="M690 -40 C820 80 740 220 890 400" stroke="#81DFE0" stroke-opacity=".09" stroke-width="80" fill="none"/>
+ <path d="M1100 -60 C1200 90 1240 210 1320 290" stroke="#81DFE0" stroke-opacity=".07" stroke-width="90" fill="none"/>
+ <rect x="51" y="46" width="236" height="31" rx="15.5" fill="#173C48" stroke="#3C7779" stroke-opacity=".6"/>
+ <circle cx="69" cy="61.5" r="4" fill="#63DECC"/>
+ <text x="83" y="66" font-family="Arial,Segoe UI,sans-serif" font-size="12" font-weight="700" letter-spacing="1.1" fill="#B7EEE6">DATA ENGINEERING PROJECT</text>
+ <text x="49" y="148" font-family="Arial,Segoe UI,sans-serif" font-size="52" font-weight="800" letter-spacing="-1.9" fill="#F4FBFF">Insurance</text>
+ <text x="49" y="206" font-family="Arial,Segoe UI,sans-serif" font-size="52" font-weight="800" letter-spacing="-1.9" fill="url(#accent)">Data Platform</text>
+ <text x="52" y="242" font-family="Arial,Segoe UI,sans-serif" font-size="16" fill="#B3C6D4">From raw insurance data to actionable risk insights.</text>
+ <line x1="52" x2="650" y1="272" y2="272" stroke="#94B8C8" stroke-opacity=".22"/>
+ <g font-family="Arial,Segoe UI,sans-serif" font-size="12.5" font-weight="700" fill="#CEDDE6">
+  <rect x="52" y="292" width="83" height="31" rx="8" fill="#1D344B" stroke="#37516A"/><text x="68" y="312">Python</text>
+  <rect x="144" y="292" width="112" height="31" rx="8" fill="#1D344B" stroke="#37516A"/><text x="161" y="312">SQL Server</text>
+  <rect x="265" y="292" width="91" height="31" rx="8" fill="#1D344B" stroke="#37516A"/><text x="280" y="312">Airflow</text>
+  <rect x="365" y="292" width="86" height="31" rx="8" fill="#1D344B" stroke="#37516A"/><text x="381" y="312">Docker</text>
+  <rect x="460" y="292" width="159" height="31" rx="8" fill="#1D344B" stroke="#37516A"/><text x="477" y="312">Machine Learning</text>
+ </g>
+ <!-- right illustration dashboard -->
+ <g filter="url(#shadow)">
+  <rect x="743" y="48" width="482" height="265" rx="20" fill="#0E2237" stroke="#426477" stroke-opacity=".95"/>
+  <rect x="743" y="48" width="482" height="42" rx="20" fill="#1C374B"/>
+  <path d="M743 70 H1225 V90 H743Z" fill="#1C374B"/>
+  <circle cx="765" cy="69" r="4" fill="#F3878D"/><circle cx="780" cy="69" r="4" fill="#F3C278"/><circle cx="795" cy="69" r="4" fill="#6FDDCA"/>
+  <text x="822" y="74" font-family="Arial,Segoe UI,sans-serif" font-size="12" font-weight="700" fill="#CCDFE9" letter-spacing="1.1">RISK INTELLIGENCE / OVERVIEW</text>
+  <rect x="763" y="111" width="179" height="179" rx="13" fill="url(#tile)" stroke="#34576A"/>
+  <text x="781" y="136" font-family="Arial,Segoe UI,sans-serif" font-size="12" fill="#A9C3D2">Risk distribution</text>
+  <circle cx="851" cy="207" r="51" fill="none" stroke="#365266" stroke-width="16"/>
+  <circle cx="851" cy="207" r="51" fill="none" stroke="#60D9C6" stroke-width="16" stroke-dasharray="174 321" transform="rotate(-90 851 207)" stroke-linecap="round"/>
+  <circle cx="851" cy="207" r="51" fill="none" stroke="#67AFF1" stroke-width="16" stroke-dasharray="79 321" stroke-dashoffset="-187" transform="rotate(-90 851 207)" stroke-linecap="round"/>
+  <text x="851" y="204" font-family="Arial,Segoe UI,sans-serif" font-size="22" font-weight="800" fill="#F4FAFD" text-anchor="middle">RISK</text>
+  <text x="851" y="223" font-family="Arial,Segoe UI,sans-serif" font-size="10" fill="#9DBACC" text-anchor="middle">ANALYTICS</text>
+  <rect x="956" y="111" width="248" height="106" rx="13" fill="url(#tile)" stroke="#34576A"/>
+  <text x="974" y="136" font-family="Arial,Segoe UI,sans-serif" font-size="12" fill="#A9C3D2">Claims trend</text>
+  <path d="M977 191H1184 M977 168H1184 M977 145H1184" stroke="#7A9EB0" stroke-opacity=".13"/>
+  <path d="M977 189L1003 179 1028 183 1050 162 1074 168 1099 151 1121 159 1148 142 1184 148" fill="none" stroke="#65DFCE" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M977 189L1003 179 1028 183 1050 162 1074 168 1099 151 1121 159 1148 142 1184 148V200H977Z" fill="#65DFCE" opacity=".07"/>
+  <rect x="956" y="229" width="248" height="61" rx="13" fill="url(#tile)" stroke="#34576A"/>
+  <text x="974" y="250" font-family="Arial,Segoe UI,sans-serif" font-size="11" fill="#A9C3D2">DATA PIPELINE</text>
+  <g fill="#70DDD0"><circle cx="987" cy="270" r="6"/><circle cx="1076" cy="270" r="6"/><circle cx="1165" cy="270" r="6"/></g>
+  <path d="M995 270H1067M1084 270H1156" stroke="#69BACB" stroke-width="2" stroke-dasharray="4 4"/>
+  <path d="M1062 265L1067 270L1062 275 M1151 265L1156 270L1151 275" stroke="#69BACB" stroke-width="2" fill="none"/>
+ </g>
+ <rect x="1190" y="30" width="50" height="25" rx="12.5" fill="#1A625E" stroke="#5DDBCE" stroke-opacity=".45"/>
+ <text x="1215" y="46" font-family="Arial,Segoe UI,sans-serif" font-size="10" font-weight="700" fill="#A1F9E8" text-anchor="middle">DEMO</text>
+</g>
 </svg>

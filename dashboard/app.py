@@ -100,14 +100,14 @@ def market_change(comparison, key, *, lower_is_better=False):
         return None
     change = comparison[key]
     rounded = round(change, 1)
-    favorable = change < 0 if lower_is_better else change > 0
-    tone = "neutral" if rounded == 0 else "positive" if favorable else "negative"
+    tone = "neutral" if rounded == 0 else "positive" if rounded > 0 else "negative"
+    arrow = "●" if rounded == 0 else "▲" if rounded > 0 else "▼"
     unit = " pp" if lower_is_better else "%"
-    meaning = "Claims / premiums movement; lower is favorable" if lower_is_better else "Premium volume movement; higher means growth"
+    meaning = "Claims / premiums" if lower_is_better else "Premium volume"
     return html.Div([
-        html.Span(f"{rounded:+.1f}{unit} · latest year", className=f"metric-change {tone}"),
+        html.Span(f"{arrow} {rounded:+.1f}{unit} · latest year", className=f"metric-change {tone}"),
         html.Span(comparison["period"], className="comparison-period"),
-    ], className="metric-comparison", title=f"{meaning}. Same calendar months: {comparison['period']}. Totals above cover the selected range.")
+    ], className="metric-comparison", title=f"{meaning} change. Color and arrow show direction only. Same calendar months: {comparison['period']}. Totals above cover the selected range.")
 
 
 def figure(key, x, y):
@@ -310,16 +310,7 @@ def platform_page():
     perf, counts = pd.DataFrame(data["performance"]), data["counts"]
     matched = sum(counts[f"{p}_staging"] == counts[f"{p}_fact"] for p in ("market", "risk"))
     reductions = 100 * (1 - perf["after_reads"] / perf["before_reads"])
-    chart = figure("SQL logical reads", "Logical reads · SQL page accesses", "")
-    for col, name, color in [("before_reads", "Before index", CONTEXT), ("after_reads", "After index", TEAL)]:
-        chart.add_bar(y=[f"Q{i + 1}" for i in range(len(perf))], x=perf[col], name=name, orientation="h", marker_color=color,
-                      customdata=perf["workload"],
-                      text=[f"{v:,}" for v in perf[col]], textposition="outside", cliponaxis=False,
-                      hovertemplate="%{y} · %{customdata}<br>%{fullData.name}: %{x:,} logical reads<extra></extra>")
-    chart.update_layout(barmode="group", bargap=.48, margin=dict(l=12, r=65, t=56, b=24))
-    chart.update_xaxes(type="linear", range=[0, float(perf["before_reads"].max()) * 1.25], nticks=4,
-                      showgrid=True, gridcolor=GRID)
-    chart.update_yaxes(autorange="reversed", showgrid=False, ticklabelstandoff=12)
+    workload_names = {"Company / month": "Company by month", "State / product / month": "State and product by month"}
     return [
         page_header("PLATFORM ASSURANCE / ENGINEERING", "See the data behind the platform",
                     "Inspect warehouse aggregates, then weigh faster SQL reads against their storage cost.",
@@ -327,21 +318,31 @@ def platform_page():
         html.Div([
             metric("Warehouse observations", number(counts["market_fact"] + counts["risk_fact"]), "Across two independent data tracks", symbol="database"),
             metric("Row-count reconciliation", f"{matched} / 2", "Staging and fact counts in this snapshot", symbol="check", tone="positive" if matched == 2 else "negative"),
-            metric("Q1 logical reads saved", f"{reductions.iloc[0]:.2f}%", "Historical company / month workload", symbol="risk", tone="positive" if reductions.iloc[0] > 0 else "negative"),
+            metric("Company query reads saved", f"{reductions.iloc[0]:.2f}%", "Historical company / month workload", symbol="risk", tone="positive" if reductions.iloc[0] > 0 else "negative"),
             metric("Additional index storage", f"{perf['index_mb'].sum():,.2f} MB", "Two covering indexes · added write cost", symbol="database", tone="cost"),
         ], className="metrics"),
         data_explorer(),
         html.Section([
-            html.Div([html.Div([html.H2("Fewer reads, with an explicit storage cost"),
-                               html.P("SQL Server STATISTICS IO · warm cache · measured 24 September 2026")]),
+            html.Div([html.Div([html.H2("What did the indexes change?"),
+                               html.P("Two fixed SQL queries · warm-cache test · measured 24 September 2026")]),
                       html.Span("HISTORICAL BENCHMARK", className="small-badge")], className="chart-heading"),
-            html.Div([graph(chart=chart), html.Div([
-                html.Div([html.Span(f"Q{i + 1:02d}"), html.Strong(f"{value:.2f}%"),
-                          html.P(f"fewer logical reads · {perf.iloc[i]['workload']}"),
-                          html.Small(f"{perf.iloc[i]['before_reads']:,} → {perf.iloc[i]['after_reads']:,} pages")],
-                         className="benchmark-stat") for i, value in enumerate(reductions)
-            ], className="benchmark-summary")], className="benchmark-layout"),
-            html.Div("Linear scale starts at zero. Short after-index bars reflect the measured reduction; labels show exact counts. This is not end-to-end dashboard speed.", className="chart-footnote"),
+            html.P("A logical read is a SQL Server page access. Compare the same query before and after adding its index.",
+                   className="benchmark-explainer"),
+            html.Div([
+                html.Article([
+                    html.Div([html.Span(f"QUERY {i + 1:02d}", className="eyebrow"),
+                              html.H3(workload_names.get(row["workload"], row["workload"]))], className="benchmark-query-heading"),
+                    html.Div([
+                        html.Div([html.Span("Before index"), html.Strong(f"{row['before_reads']:,}")], className="benchmark-value before"),
+                        html.Span("→", className="benchmark-arrow", **{"aria-hidden": "true"}),
+                        html.Div([html.Span("After index"), html.Strong(f"{row['after_reads']:,}")], className="benchmark-value after"),
+                    ], className="benchmark-values"),
+                    html.Div([html.Strong(f"{reductions.iloc[i]:.2f}%"), " fewer page reads"], className="benchmark-reduction"),
+                ], className="benchmark-query", id=f"benchmark-query-{i + 1}") for i, row in perf.iterrows()
+            ], className="benchmark-queries"),
+            html.Div([html.Strong("Storage trade-off: "),
+                      f"the two indexes add {perf['index_mb'].sum():,.2f} MB and extra write work. "
+                      "These numbers describe those two SQL queries, not dashboard response time."], className="chart-footnote"),
         ], className="chart-card benchmark-card"),
     ]
 

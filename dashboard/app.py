@@ -9,12 +9,13 @@ from urllib.parse import quote
 
 import pandas as pd
 import plotly.graph_objects as go
-from dash import Dash, Input, Output, State, dcc, html, no_update
+from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
 
 BLUE, TEAL, ORANGE, INK, MUTED = "#003366", "#007c83", "#d17b52", "#13334b", "#61768a"
 PALE_BLUE, GRID = "#9db9cb", "#e5edf2"
+EXPLORER_PAGE_SIZE = 15
 STATES = {
     "AC": "Acre", "AL": "Alagoas", "AM": "Amazonas", "AP": "Amapá", "BA": "Bahia",
     "CE": "Ceará", "DF": "Federal District", "ES": "Espírito Santo", "GO": "Goiás",
@@ -88,7 +89,7 @@ def ratio(numerator, denominator):
 def metric(label, value, detail, *, symbol="rows", tone="neutral", exact=None, comparison=None):
     display = [value[:-3], html.Span("MB", className="metric-unit")] if value.endswith(" MB") else value
     return html.Div([
-        html.Div([html.Span(label, className="metric-label"), icon(symbol)], className="metric-top"),
+        html.Div([icon(symbol), html.Span(label, className="metric-label")], className="metric-top"),
         html.Strong(display, title=str(exact) if exact is not None else value), html.Small(detail), comparison,
     ], className=f"metric {tone}")
 
@@ -176,7 +177,7 @@ def market_page():
     years = sorted(monthly["month"].str[:4].astype(int).unique())
     return [
         page_header("MARKET INTELLIGENCE / TRACK A", "Insurance market overview",
-                    "Understand premium volume, claims and the companies shaping Brazil’s insurance market.",
+                    "Follow premiums and claims over time, then see which insurers and products shape that volume.",
                     "SOURCE COVERAGE", "Jan 2003 — Jul 2023", "SUSEP · 27 Brazilian states"),
         html.Div([
             state_filter("market", sorted(monthly["state"].unique())),
@@ -213,7 +214,7 @@ def risk_page():
     metrics = snapshot()["model_metrics"]
     return [
         page_header("MOTOR ANALYTICS / TRACK B", "Motor risk & model insights",
-                    "Observed claim patterns and cross-sectional model scores, across two distinct analysis populations.",
+                    "Read exposure and claim patterns first, then compare held-out model scores with observed outcomes.",
                     "MODEL EVALUATION", f"{metrics['rows']:,} held-out observations", "Historical evaluation · September 2026"),
         html.Div([
             state_filter("risk", sorted(table("risk", "segments")["state"].unique())),
@@ -235,23 +236,57 @@ def risk_page():
     ]
 
 
-def reconciliation_table(counts):
+def explorer_page(track, state="ALL", page=0):
+    """Return one bounded page of aggregate rows from the dated snapshot."""
+    if track == "risk":
+        frame = table("risk", "segments").replace({"Không rõ": "Unknown"})
+        frame = frame.sort_values(["observations", "state"], ascending=[False, True])
+        headers = ["State", "Gender", "Age group", "Observations", "Exposure", "Premiums", "Claims", "Claim count", "HasClaim share"]
+    else:
+        frame = table("market", "monthly").sort_values(["month", "state"], ascending=[False, True])
+        headers = ["Month", "State", "Premiums", "Claims", "Claims / premiums", "Observations"]
+    if state and state != "ALL":
+        frame = frame.loc[frame["state"] == state]
+    total = len(frame)
+    pages = max(1, (total + EXPLORER_PAGE_SIZE - 1) // EXPLORER_PAGE_SIZE)
+    page = max(0, min(int(page or 0), pages - 1))
     rows = []
-    for label, detail, prefix in [("SUSEP Market", "Company / month / product / state", "market"),
-                                  ("brvehins1 Motor Risk", "Aggregate motor-risk observations", "risk")]:
-        staging, fact = counts[f"{prefix}_staging"], counts[f"{prefix}_fact"]
-        matched = staging == fact
-        rows.append(html.Tr([
-            html.Td([html.Strong(label), html.Small(detail)]),
-            html.Td(f"{staging:,}", className="numeric"), html.Td(f"{fact:,}", className="numeric"),
-            html.Td(f"{fact - staging:+,}" if fact != staging else "0", className="numeric"),
-            html.Td(html.Span([icon("check") if matched else icon("info"), "Matched" if matched else "Review"],
-                              className="reconcile-status matched" if matched else "reconcile-status review")),
-        ]))
-    return html.Div(html.Table([
-        html.Thead(html.Tr([html.Th(label, scope="col") for label in
-                           ["Data track", "Staging rows", "Fact rows", "Difference", "Reconciliation"]])), html.Tbody(rows),
-    ]), className="table-scroll", tabIndex=0, role="region", **{"aria-label": "Warehouse row reconciliation"})
+    for row in frame.iloc[page * EXPLORER_PAGE_SIZE:(page + 1) * EXPLORER_PAGE_SIZE].to_dict("records"):
+        if track == "risk":
+            share = ratio(row["has_claim"], row["observations"])
+            rows.append([row["state"], row["gender"], row["age"], f"{row['observations']:,}",
+                         f"{row['exposure']:,.2f}", f"{row['premium']:,.2f}", f"{row['claims']:,.2f}",
+                         f"{row['claim_count']:,}", number(share, percent=True)])
+        else:
+            share = ratio(row["claims"], row["premium"])
+            rows.append([row["month"][:7], row["state"], f"{row['premium']:,.2f}",
+                         f"{row['claims']:,.2f}", number(share, percent=True), f"{row['observations']:,}"])
+    return headers, rows, total, page, pages
+
+
+def data_explorer():
+    states = sorted(table("market", "monthly")["state"].unique())
+    return html.Section([
+        html.Div([html.Div([html.H2("Inspect the data behind the charts"),
+                           html.P("Browse actual aggregate rows from the dated SQL export. Select a source and a state.")]),
+                  html.Span("DATA EXPLORER", className="small-badge")], className="chart-heading"),
+        html.Div([
+            dcc.RadioItems(id="data-track", value="market", options=[
+                {"label": "SUSEP market", "value": "market"}, {"label": "Motor risk", "value": "risk"},
+            ], className="segmented data-switch"),
+            state_filter("data", states),
+            html.Span(id="data-count", className="data-count"),
+        ], className="data-controls"),
+        dcc.Store(id="data-page", data=0),
+        html.Div(id="data-table", className="table-scroll data-table", tabIndex=0, role="region",
+                 **{"aria-label": "Paginated aggregate data"}),
+        html.Div([html.Span(id="data-page-status", **{"aria-live": "polite"}),
+                  html.Div([html.Button("Previous", id="data-prev", className="button"),
+                            html.Button("Next", id="data-next", className="button")], className="data-actions")],
+                 className="data-pagination"),
+        html.Div("These are grouped snapshot records, not raw source rows or individual policies. Refresh the SQL export to update them.",
+                 className="chart-footnote"),
+    ], className="chart-card data-panel")
 
 
 def platform_page():
@@ -268,8 +303,8 @@ def platform_page():
     chart.update_xaxes(type="log", range=[2, 6.1], tickvals=[100, 1000, 10000, 100000, 1000000], ticktext=["100", "1K", "10K", "100K", "1M"])
     chart.update_yaxes(autorange="reversed", showgrid=False, ticklabelstandoff=12)
     return [
-        page_header("PLATFORM ASSURANCE / ENGINEERING", "Quality you can trace",
-                    "Reconcile warehouse counts and see the measured trade-offs behind faster SQL queries.",
+        page_header("PLATFORM ASSURANCE / ENGINEERING", "See the data behind the platform",
+                    "Inspect warehouse aggregates, then weigh faster SQL reads against their storage cost.",
                     "EVIDENCE WINDOW", "Snapshot + historical benchmark", "SQL benchmark measured 24 Sep 2026"),
         html.Div([
             metric("Warehouse observations", number(counts["market_fact"] + counts["risk_fact"]), "Across two independent data tracks", symbol="database"),
@@ -277,6 +312,7 @@ def platform_page():
             metric("Q1 logical reads saved", f"{reductions.iloc[0]:.2f}%", "Historical company / month workload", symbol="risk", tone="positive" if reductions.iloc[0] > 0 else "negative"),
             metric("Additional index storage", f"{perf['index_mb'].sum():,.2f} MB", "Two covering indexes · added write cost", symbol="database", tone="cost"),
         ], className="metrics"),
+        data_explorer(),
         html.Section([
             html.Div([html.Div([html.H2("Fewer reads, with an explicit storage cost"),
                                html.P("SQL Server STATISTICS IO · warm cache · measured 24 September 2026")]),
@@ -289,19 +325,11 @@ def platform_page():
             ], className="benchmark-summary")], className="benchmark-layout"),
             html.Div("Logical reads measure SQL page accesses. These results do not measure end-to-end dashboard speed.", className="chart-footnote"),
         ], className="chart-card benchmark-card"),
-        html.Section([
-            html.Div([html.Div([html.H2("Both data tracks, reconciled at the source"),
-                               html.P("Current snapshot counts. Each track keeps its own grain and identity.")]),
-                      html.Span("ROW COUNTS", className="small-badge")], className="chart-heading"),
-            reconciliation_table(counts),
-            html.Div("Matching row counts are one check. Full data-quality gate logs remain in SQL Server; this view does not rerun those gates.", className="chart-footnote"),
-        ], className="chart-card quality-panel"),
     ]
 
 
-def navigation_label(symbol, title, subtitle, index):
-    return html.Span([icon(symbol), html.Span([html.Strong(title), html.Small(subtitle)], className="nav-copy"),
-                      html.Span(index, className="nav-number")], className="nav-option")
+def navigation_label(symbol, title):
+    return html.Span([icon(symbol), html.Strong(title)], className="nav-option")
 
 
 app.layout = html.Div([
@@ -309,13 +337,12 @@ app.layout = html.Div([
     html.Aside([
         html.A([html.Span(icon("shield"), className="brand-mark"),
                 html.Div([html.Strong("Insurance"), html.Span("INTELLIGENCE")])], href="/", className="brand"),
-        html.Div("ANALYTICS WORKSPACE", className="nav-label"),
+        html.Div("EXPLORE", className="nav-label"),
         html.Nav(dcc.RadioItems(id="section", value="market", options=[
-            {"label": navigation_label("grid", "Market overview", "Premiums & claims", "01"), "value": "market"},
-            {"label": navigation_label("risk", "Motor risk & ML", "Patterns & model scores", "02"), "value": "risk"},
-            {"label": navigation_label("database", "Data & performance", "Quality & SQL evidence", "03"), "value": "platform"},
+            {"label": navigation_label("grid", "Market"), "value": "market"},
+            {"label": navigation_label("risk", "Motor risk"), "value": "risk"},
+            {"label": navigation_label("database", "Data"), "value": "platform"},
         ], className="nav-items"), **{"aria-label": "Analytics sections"}),
-        html.Div([html.Span("PERSONAL PROJECT"), html.P("Insurance Data Platform"), html.Small("Data engineering · Analytics")], className="sidebar-footer"),
     ], className="sidebar"),
     html.Main([
         html.Header([html.Div([html.Span("Workspace"), html.Span("/", className="breadcrumb-divider"), html.Strong("Insurance analytics")], className="breadcrumb"),
@@ -331,6 +358,37 @@ def render_page(section):
         return {"market": market_page, "risk": risk_page, "platform": platform_page}.get(section, market_page)(), provenance()
     except (OSError, ValueError, KeyError) as exc:
         return html.Div([html.H1("A data snapshot is needed"), html.P(str(exc)), html.Code("python pipeline/manage.py export")], className="snapshot-error"), ""
+
+
+@app.callback(Output("data-page", "data"), Input("data-prev", "n_clicks"), Input("data-next", "n_clicks"),
+              Input("data-track", "value"), Input("data-state", "value"), State("data-page", "data"))
+def change_data_page(previous, following, track, state, page):
+    if ctx.triggered_id in ("data-track", "data-state", None):
+        return 0
+    _, _, _, current, pages = explorer_page(track, state, page)
+    return max(0, current - 1) if ctx.triggered_id == "data-prev" else min(pages - 1, current + 1)
+
+
+@app.callback(Output("data-table", "children"), Output("data-count", "children"),
+              Output("data-page-status", "children"), Output("data-prev", "disabled"),
+              Output("data-next", "disabled"), Input("data-track", "value"),
+              Input("data-state", "value"), Input("data-page", "data"))
+def render_explorer(track, state, page):
+    headers, rows, total, current, pages = explorer_page(track, state, page)
+    if rows:
+        content = html.Table([
+            html.Thead(html.Tr([html.Th(label, scope="col", className="numeric" if label not in
+                                       ("Month", "State", "Gender", "Age group") else "") for label in headers])),
+            html.Tbody([html.Tr([html.Td(value, className="numeric" if headers[i] not in
+                                        ("Month", "State", "Gender", "Age group") else "")
+                                  for i, value in enumerate(row)]) for row in rows]),
+        ])
+    else:
+        content = html.P("No aggregate rows match this state.", className="data-empty")
+    first = current * EXPLORER_PAGE_SIZE + 1 if total else 0
+    last = min((current + 1) * EXPLORER_PAGE_SIZE, total)
+    return (content, f"{total:,} aggregate rows", f"Rows {first:,}–{last:,} · Page {current + 1} of {pages}",
+            current == 0, current >= pages - 1)
 
 
 @app.callback(Output("market-state", "value"), Output("market-years", "value"), Input("market-reset", "n_clicks"), prevent_initial_call=True)

@@ -39,7 +39,7 @@ Python and pandas load and aggregate data; SQL Server stores and checks it; Plot
 
 ## Dashboard stories
 
-These are **individual charts from the English-language Dash app**, captured from the SQL export dated **11 November 2026**. They show the unfiltered default view. Choose a state or year range in the app to ask a narrower question; the screenshot findings below describe only the displayed population. The dashboard is a snapshot, not a live SQL view.
+These are **individual views from the English-language Dash app**, captured from the SQL export dated **11 November 2026**. They show the unfiltered default view. Choose a state or year range in the app to ask a narrower question; the screenshot findings below describe only the displayed population. The dashboard is a snapshot, not a live SQL view. For a page-by-page narrative in Vietnamese, read [the dashboard story guide](dashboard/STORY.md).
 
 ### Market overview · Track A
 
@@ -77,11 +77,17 @@ These are **individual charts from the English-language Dash app**, captured fro
 
 ### Data quality and performance
 
+#### Which data rows feed the dashboard?
+
+<p align="center"><img src="dashboard/assets/data-explorer.png" alt="Paginated SUSEP month and state aggregate rows in the Dash data explorer" width="100%"></p>
+
+**Reading:** The Data tab now exposes the dated SQL snapshot's **6,669** market month/state aggregates or **644** motor risk segments. Switch source, filter by state, and page through 15 rows at a time. The market view shows premiums, claims, their ratio, and observation counts. The motor view shows exposure, claim counts, and observed `HasClaim` share by state, source gender label, and age group. These rows are aggregates; they are not the private raw records or individual customers and policies.
+
 #### What did the SQL indexes improve, and what did they cost?
 
 <p align="center"><img src="dashboard/assets/sql-benchmark.png" alt="Before and after SQL logical reads for two SUSEP workloads, with a log-scale axis" width="100%"></p>
 
-**Reading:** In a **24 September 2026** warm-cache benchmark, two covering indexes reduced logical reads by **98.94%** for the company/month workload and **98.82%** for the state/product/month workload. They also added approximately **924.51 MB** of index storage and write overhead. Logical reads measure SQL page accesses; this is historical evidence for those two queries, not a new benchmark or an end-to-end dashboard speed test. The same app tab shows current snapshot staging/fact row-count reconciliation for both tracks.
+**Reading:** In a **24 September 2026** warm-cache benchmark, two covering indexes reduced logical reads by **98.94%** for the company/month workload and **98.82%** for the state/product/month workload. They also added approximately **924.51 MB** of index storage and write overhead. Logical reads measure SQL page accesses; this is historical evidence for those two queries, not a new benchmark or an end-to-end dashboard speed test. The Data tab's KPI also shows staging/fact row-count reconciliation from the current snapshot.
 
 The app also includes age-group and profile-label views, per-track filters and resets, CSV exports of **filtered aggregates**, and Plotly PNG chart downloads. Market KPI comparison badges use matching calendar months in the prior year and can show favorable or unfavorable movement. The risk tab separates full-warehouse observations from the 20,000-row held-out model sample.
 
@@ -167,7 +173,7 @@ Compose requires `SQLSERVER_SA_PASSWORD` in `.env` for configuration interpolati
 ## Repository layout and storage
 
 ```text
-dashboard/   Dash app, styling, technology diagram, banner, and chart images
+dashboard/   Dash app, styling, technology diagram, chart images, and STORY.md
 pipeline/    Ingestion, validation, quality operations, ML, export, Airflow DAG, CLI
 database/    Versioned SQL migrations V1–V14 and benchmark SQL
 infra/       Dockerfiles and service-specific dependencies

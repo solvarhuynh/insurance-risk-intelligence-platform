@@ -1,68 +1,93 @@
 <p align="center">
-  <img src="dashboard/assets/banner.svg" alt="Insurance Data Platform — Python, SQL Server, Airflow, Docker và phân tích rủi ro" width="100%">
+  <img src="dashboard/assets/banner.svg" alt="Insurance Data Platform: a personal data engineering and risk analytics project" width="100%">
 </p>
 
 <p align="center">
   <img src="https://img.shields.io/badge/Python-3.12-3776AB?style=flat-square&amp;logo=python&amp;logoColor=white" alt="Python 3.12">
   <img src="https://img.shields.io/badge/SQL_Server-2022-CC2927?style=flat-square" alt="SQL Server 2022">
-  <img src="https://img.shields.io/badge/Airflow-2.8-017CEE?style=flat-square&amp;logo=apacheairflow&amp;logoColor=white" alt="Airflow 2.8">
+  <img src="https://img.shields.io/badge/Apache_Airflow-2.8-017CEE?style=flat-square&amp;logo=apacheairflow&amp;logoColor=white" alt="Apache Airflow 2.8">
   <img src="https://img.shields.io/badge/Plotly-Dash-147D78?style=flat-square&amp;logo=plotly&amp;logoColor=white" alt="Plotly Dash">
   <img src="https://img.shields.io/badge/Docker-Compose-2496ED?style=flat-square&amp;logo=docker&amp;logoColor=white" alt="Docker Compose">
 </p>
 
-<p align="center"><strong>Từ CSV bảo hiểm đến kho dữ liệu có kiểm soát chất lượng, mô hình rủi ro và dashboard tương tác.</strong></p>
+<p align="center"><strong>From insurance CSVs to a quality-checked SQL warehouse, risk analysis, and an interactive dashboard.</strong></p>
 
 <p align="center">
-  <a href="#dashboard"><strong>↗ Xem dashboard</strong></a>
-  &nbsp;&nbsp;·&nbsp;&nbsp;
-  <a href="#architecture"><strong>◇ Xem sơ đồ dự án</strong></a>
+  <a href="#dashboard-stories">Explore the charts</a> ·
+  <a href="#quick-start">Run the dashboard</a> ·
+  <a href="#technology-map">View the technology map</a>
 </p>
 
-> **Liên kết dashboard công khai:** đang chờ triển khai. Nút trên dẫn tới ảnh xem trước và cách chạy local; sau khi có URL Vercel, thay `href="#dashboard"` bằng URL thật. Ứng dụng Dash hiện chạy bằng Python/Gunicorn; triển khai Vercel cần kiểm tra runtime và chức năng export, chưa được xác nhận trong repo này.
+## What this project does
 
-## Tổng quan
+Insurance Data Platform is a personal data engineering and analytics project. Python ingests source CSVs in batches, SQL Server stores staging and dimensional warehouse tables, quality gates check the loads, and Airflow can orchestrate the jobs. Plotly Dash serves an exported, timestamped aggregate snapshot, so changing a filter does not scan millions of SQL rows.
 
-**Insurance Data Platform** là dự án cá nhân về data engineering và analytics. Python nạp dữ liệu theo batch; SQL Server giữ staging, star schema, kiểm tra chất lượng và prediction; Airflow điều phối; Plotly Dash đọc một snapshot aggregate có ghi thời điểm xuất. Dashboard không truy vấn hàng triệu dòng mỗi lần đổi bộ lọc.
+The two sources answer different questions:
 
-- **Track A · SUSEP Market:** 8.338.214 dòng theo *công ty × tháng × sản phẩm × bang*, giai đoạn 01/2003–07/2023. Phục vụ phân tích premium, claims, loss ratio và hiệu năng truy vấn.
-- **Track B · brvehins1 Motor Risk:** 1.965.355 quan sát rủi ro tổng hợp trong năm CSV. Phục vụ phân tích exposure, claim frequency và mô hình liên hệ với `HasClaim`.
+- **Track A — SUSEP insurance market:** 8,338,214 rows at company × month × product × state grain, from January 2003 through July 2023. It supports premium, claims, product mix, and SQL performance analysis.
+- **Track B — brvehins1 motor risk:** 1,965,355 aggregate risk observations across five CSV files. It supports exposure and observed claim analysis, plus a bounded `HasClaim` model evaluation.
 
-Hai nguồn có **grain và danh tính khác nhau**. Không có khóa chung được chứng minh để join từng dòng; dự án giữ hai nhánh warehouse độc lập. Prudential là hướng tương lai, **chưa có raw data hoặc pipeline**.
+The sources have different grains and no demonstrated shared customer, policy, or claim identity. Their warehouse tracks remain independent; there is no row-level join. Prudential is a future idea with no raw data or implemented pipeline.
 
-<a id="architecture"></a>
-## Sơ đồ kiến trúc
+## Technology map
 
 <p align="center">
-  <img src="dashboard/assets/architecture.svg" alt="Hai luồng độc lập SUSEP Market và brvehins1 Motor Risk đi từ CSV qua Python, SQL Server và quality gate; aggregate JSON cấp dữ liệu cho Plotly Dash; Airflow điều phối" width="100%">
+  <img src="dashboard/assets/architecture.svg" alt="Technology logos for Python, SQL Server, Plotly Dash, Apache Airflow, scikit-learn, and Docker Compose" width="100%">
 </p>
 
-**Đọc sơ đồ từ trái sang phải:** CSV gốc → Python ingest → SQL staging/star schema → quality gate → aggregate hoặc scoring → snapshot JSON → Dash. Airflow chạy thứ tự công việc, Docker Compose chạy các dịch vụ local. Đường nối ở cuối chỉ gom **kết quả tổng hợp** cho giao diện, không phải join hai nguồn ở mức bản ghi.
+Python and pandas load and aggregate data; SQL Server stores and checks it; Plotly Dash presents the exported JSON snapshot. Airflow coordinates local jobs, scikit-learn supports the separately run model workflow, and Docker Compose starts the local services. The diagram shows the tools used in this repository, not a join between its two data sources.
 
-### Các lớp dữ liệu
+## Dashboard stories
 
-1. **Nguồn và nạp dữ liệu:** `pipeline/load_market.py` và `load_risk.py` đọc CSV theo batch, kiểm header/kiểu và giữ lineage (`SourceFile`, số dòng, hash, batch). Raw chỉ đọc và không nằm trong Git.
-2. **SQL Server:** schema `stg` giữ dữ liệu nạp; `dwh` giữ dimension/fact của hai track; `meta` ghi version và batch; `dq` chạy quality gate. File SQL trong repo tạo schema, còn **database thật nằm trong Docker volume**.
-3. **Phân tích:** Track A đối soát raw/staging/fact và tính aggregate thị trường. Track B có bảng prediction cho 20.000 dòng held-out; model binary nằm local, không được tự train khi mở dashboard.
-4. **Phục vụ giao diện:** `pipeline/export_dash.py` xuất các bảng aggregate vào `data/dashboard.json`. Dash lọc và vẽ từ snapshot này; muốn thấy dữ liệu SQL mới phải chạy `export` rồi tải lại trang.
+These are **individual charts from the English-language Dash app**, captured from the SQL export dated **11 November 2026**. They show the unfiltered default view. Choose a state or year range in the app to ask a narrower question; the screenshot findings below describe only the displayed population. The dashboard is a snapshot, not a live SQL view.
 
-<a id="dashboard"></a>
-## Dashboard
+### Market overview · Track A
 
-<p align="center">
-  <img src="dashboard/assets/preview.png" alt="Giao diện Plotly Dash tiếng Anh với ba trang Market, Motor Risk và Data Performance" width="100%">
-</p>
+#### How have premiums and claims changed?
 
-Giao diện **tiếng Anh**, có bộ lọc riêng cho từng nguồn, KPI giải thích rõ phạm vi, biểu đồ tương tác và bố cục cho desktop/mobile:
+<p align="center"><img src="dashboard/assets/market-trend.png" alt="Monthly SUSEP premiums and claims from 2003 to July 2023" width="100%"></p>
 
-- **Market overview:** premium, claims, ratio, top company/product; lọc bang và năm; đổi Monthly/Annual; tải CSV aggregate theo bộ lọc.
-- **Motor risk & ML:** exposure, claim frequency, phân bố score và so sánh score với `HasClaim` quan sát. ROC-AUC/AP là số đo lịch sử của toàn bộ held-out, không đổi theo filter.
-- **Data & performance:** bảng đối soát staging/fact và benchmark SQL có ghi ngày đo; biểu đồ nêu cả lợi ích đọc dữ liệu và chi phí lưu index.
+**Reading:** Premium volume rises over much of the series while claims remain below premiums. Across the full selected period, premiums total **3.05 trillion** and claims **735.52 billion** in *source units*, giving a **24.1% claims-to-premiums ratio**. The latest comparable period, January–July 2023 versus January–July 2022, has **8.9% higher premiums** and a **4.9 percentage-point lower ratio**. The chart can switch between monthly and annual aggregation; 2023 contains only January–July, so its annual point is a partial year. This ratio is a descriptive aggregate, not a profit margin.
 
-Ảnh trên chụp ứng dụng chạy từ snapshot xuất từ SQL thật vào **11/11/2026**. Dashboard không realtime, không cần credential SQL để xem local. CSV tải xuống là **aggregate đã lọc**, không phải raw CSV hay toàn bộ prediction.
+#### Which companies account for the most premium volume?
 
-### Chạy nhanh từ snapshot đi kèm
+<p align="center"><img src="dashboard/assets/market-companies.png" alt="Top ten SUSEP companies ranked by premium volume" width="80%"></p>
 
-Cần **Python 3.12**. Mở PowerShell tại root repository:
+**Reading:** BRADESCO VIDA and BRASILPREV lead this selection at approximately **455.2 billion** and **443.0 billion** source units. Their shares of total premium volume are about **14.9%** and **14.5%**. Ranking is based on the selected years and state; hover in the app for full source names. A large volume does not establish a better claims result.
+
+#### Which product lines dominate the mix?
+
+<p align="center"><img src="dashboard/assets/market-products.png" alt="Top eight SUSEP product lines ranked by premium volume" width="80%"></p>
+
+**Reading:** “VGBL & related plans” is the largest displayed line at about **1.10 trillion** source units, or **36.0%** of all selected premiums. “Motor own damage” follows at about **382.3 billion**. These are source product categories; the app keeps source codes and full names in hover details. Concentration is a volume observation, not a forecast.
+
+### Motor risk and model · Track B
+
+#### Where do held-out model scores fall?
+
+<p align="center"><img src="dashboard/assets/risk-distribution.png" alt="Held-out HasClaim model score distribution in 0.05-wide bands" width="80%"></p>
+
+**Reading:** **13,526 of 20,000 held-out observations (67.6%)** have a model score below 0.20. The chart describes the score distribution of a bounded, historical evaluation sample. It does not display scores for every warehouse row, and the scores are not validated probabilities of future claims.
+
+#### Do higher score bands contain more observed claims?
+
+<p align="center"><img src="dashboard/assets/risk-observed.png" alt="Observed HasClaim share compared with mean model score across held-out score bands" width="80%"></p>
+
+**Reading:** In the held-out sample, the combined bands below 0.20 have **8.8%** observed `HasClaim`, while bands from 0.50 upward have **69.9%** across **1,091** observations. The chart compares the observed share with the mean score within each band; small high-score bands can be noisy. This is cross-sectional association, not a future underwriting probability or evidence of causality. The historical full-sample ROC-AUC is **0.808815** and average precision is **0.513523**; those metrics do not change with the dashboard's state filter.
+
+### Data quality and performance
+
+#### What did the SQL indexes improve, and what did they cost?
+
+<p align="center"><img src="dashboard/assets/sql-benchmark.png" alt="Before and after SQL logical reads for two SUSEP workloads, with a log-scale axis" width="100%"></p>
+
+**Reading:** In a **24 September 2026** warm-cache benchmark, two covering indexes reduced logical reads by **98.94%** for the company/month workload and **98.82%** for the state/product/month workload. They also added approximately **924.51 MB** of index storage and write overhead. Logical reads measure SQL page accesses; this is historical evidence for those two queries, not a new benchmark or an end-to-end dashboard speed test. The same app tab shows current snapshot staging/fact row-count reconciliation for both tracks.
+
+The app also includes age-group and profile-label views, per-track filters and resets, CSV exports of **filtered aggregates**, and Plotly PNG chart downloads. Market KPI comparison badges use matching calendar months in the prior year and can show favorable or unfavorable movement. The risk tab separates full-warehouse observations from the 20,000-row held-out model sample.
+
+## Quick start
+
+**To view the bundled dashboard snapshot, you only need Python 3.12.** From the repository root in PowerShell:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -70,30 +95,36 @@ py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m dashboard.app
 ```
 
-Mở `http://127.0.0.1:8050`. Nếu `.venv` đã có, bỏ qua bước tạo venv. Cách này dùng `data/dashboard.json`; **không cần** SQL Server, raw CSV, `.env` hoặc model binary.
+Open **http://127.0.0.1:8050**. If the virtual environment already exists, skip its creation. This path reads `data/dashboard.json` and needs no SQL Server login, raw CSV, `.env`, or private model binary. Stop the app with `Ctrl+C`. To refresh the displayed data after a new SQL load, run `export` in the full pipeline below and reload the page. No public dashboard URL is configured yet.
 
-## Chạy toàn bộ pipeline
+## Run the full pipeline
 
-Phần này cần **Docker Desktop**, **ODBC Driver 18 for SQL Server** trên host, Python 3.12 và CSV đúng contract. Không cần các thành phần đó nếu chỉ xem dashboard.
+This path requires **Docker Desktop**, **Python 3.12**, **Microsoft ODBC Driver 18 for SQL Server on the host**, and the source CSVs described below. Run commands from the repository root. Use the same virtual environment and installed `requirements.txt` from Quick start.
 
-### 1. Cấu hình và khởi động SQL Server
+### 1. Configure and start SQL Server
 
 ```powershell
 if (-not (Test-Path .env)) { Copy-Item .env.example .env }
-# Mở .env và điền SQLSERVER_SA_PASSWORD mạnh, chỉ giữ trên máy.
+# Edit .env and set SQLSERVER_SA_PASSWORD to a strong local password.
 docker compose up -d sqlserver
 docker compose logs --tail 30 sqlserver
 .venv\Scripts\python.exe pipeline/manage.py migrate
 ```
 
-Đợi SQL Server sẵn sàng trước khi migrate. `.env.example` mô tả cả biến tùy chọn; `.env` có thể chỉ gồm `SQLSERVER_SA_PASSWORD`. `pipeline/config.py` mặc định host `localhost,1433`, database `DWH_Insurance` và user `sa`. Nếu volume SQL đã tồn tại, dùng **mật khẩu cũ**; đổi `.env` không đổi mật khẩu trong database. Migration V1–V14 chạy theo số và skip version đã ghi nhận.
+Wait until SQL Server is ready before migration. `.env.example` lists optional settings; `.env` can contain only `SQLSERVER_SA_PASSWORD` because host (`localhost,1433`), database (`DWH_Insurance`), and user (`sa`) have defaults in `pipeline/config.py`. Keep `.env` private. An existing SQL volume retains its original `sa` password; editing `.env` alone does not change it. Migrations **V1–V14** run in numeric order and skip versions already recorded in SQL Server.
 
-### 2. Đặt nguồn và nạp kho dữ liệu
+### 2. Supply and validate the source files
 
 ```text
 data/raw/susep.gov.br/insurance_dataset.csv
-data/raw/brvehins1/brvehins1a.csv ... brvehins1e.csv
+data/raw/brvehins1/brvehins1a.csv
+data/raw/brvehins1/brvehins1b.csv
+data/raw/brvehins1/brvehins1c.csv
+data/raw/brvehins1/brvehins1d.csv
+data/raw/brvehins1/brvehins1e.csv
 ```
+
+Raw files are local-only and must be left unchanged. Then run:
 
 ```powershell
 .venv\Scripts\python.exe pipeline/validate.py --raw
@@ -102,61 +133,57 @@ data/raw/brvehins1/brvehins1a.csv ... brvehins1e.csv
 .venv\Scripts\python.exe pipeline/manage.py quality
 .venv\Scripts\python.exe pipeline/manage.py status
 .venv\Scripts\python.exe pipeline/reconcile_market.py
+.venv\Scripts\python.exe pipeline/manage.py export
 ```
 
-Loader bỏ qua batch cùng fingerprint đã hoàn tất. Lần đầu có thể mất thời gian vì hơn 10 triệu dòng. Hai quality gate SQL cần PASS trước khi coi dữ liệu sẵn sàng cho phân tích; `status` chỉ đếm dòng, không thay thế quality gate.
+The first load can take time for more than ten million rows. Completed input batches are fingerprinted so repeated loads can skip them. Both SQL quality gates must pass before treating the warehouse as ready; row counts from `status` alone are insufficient. `export` writes a new timestamped aggregate snapshot for Dash. Run it after the quality checks when data changes.
 
-### 3. Score và cập nhật dashboard
+### 3. Optional model scoring and Airflow
 
 ```powershell
 .venv\Scripts\python.exe pipeline/manage.py score
 .venv\Scripts\python.exe pipeline/manage.py export
-```
-
-`score` cần artifact model local tại `data/models/claim_risk_model_v001.joblib` và warehouse Track B đã nạp. Artifact **không có trong bản clone công khai**. Huấn luyện mới là tác vụ riêng qua `pipeline/train_risk.py`, chỉ chạy khi chủ động đánh giá lại model. Bản clone không có artifact vẫn xem được snapshot đi kèm.
-
-### Tùy chọn: Dashboard và Airflow qua Docker
-
-```powershell
-docker compose --profile analytics up -d --build dashboard
 docker compose --profile orchestration up -d --build airflow
 ```
 
-Dash dùng cổng `8050`, Airflow dùng `8080`, SQL Server dùng `1433`, tất cả bind local `127.0.0.1`. Chỉ chạy **một** dashboard trên cổng 8050. Compose đọc `.env` để nội suy password SQL ngay cả khi chỉ bật profile analytics.
+`score` needs the already trained local artifact at `data/models/claim_risk_model_v001.joblib` and a loaded Track B warehouse. That binary is **not included in a public clone**. Training is a separate, deliberate operation through `pipeline/train_risk.py`; running the dashboard never trains a model. Export again after scoring if you want the dashboard snapshot to reflect new prediction aggregates.
 
-Airflow DAG `insurance_data_platform` có `schedule=None`: bật và trigger thủ công trong UI. Nhánh A nạp/đối soát/DQ; nhánh B kiểm foundation đã có/DQ/score/kiểm prediction. DAG **không tự nạp Track B lần đầu, không train model, không export snapshot**. Task phụ thuộc chỉ chạy sau khi task trước thành công; hai nhánh không cần join dữ liệu.
+Airflow runs at **http://127.0.0.1:8080** using the `insurance_data_platform` DAG. The DAG has `schedule=None`: trigger it manually. Track A loads, reconciles, and quality-checks market data. Track B assumes its foundation and model already exist, then checks quality, scores, and verifies predictions. The DAG does **not** perform first-time Track B loading, model training, or dashboard export. Airflow uses a local standalone/SQLite setup here; its CLI test evidence is not a production scheduler run.
 
-## Data contract
+To run Dash in Docker instead of the Python command:
 
-- **SUSEP:** header phải là `company_code,company_name,year_month,product,state,premiums,claims,claim_premium_ratio`. Một dòng là một tổ hợp company/month/product/state. `premiums` và `claims` là aggregate nguồn; raw text được giữ để audit, số phân tích dùng `DECIMAL(38,18)` với chính sách làm tròn đã định. `claim_premium_ratio` có thể `NA`; loss ratio trên dashboard được tính từ `SUM(claims) / SUM(premiums)` khi mẫu số dương.
-- **brvehins1:** 23 cột mô tả driver/vehicle/geography, exposure, premium và năm nhóm claim. Một dòng là **quan sát rủi ro tổng hợp**, không mặc định là một khách hàng, hợp đồng hay claim event. `HasClaim = 1` khi tổng năm `ClaimNb* > 0`; claim frequency = tổng số claim / exposure khi exposure dương. Dòng trùng nội dung vẫn có lineage riêng.
-- **ML:** feature chỉ dùng `Gender`, `DrivAge`, `VehYear`, `VehModel`, `VehGroup`, `Area`, `StateAb`. Split theo `SourceRecordHash` để hạn chế rò rỉ bản ghi trùng. Mẫu 100.004 dòng có giới hạn tài nguyên; test held-out 20.000 dòng. Nguồn B không có thời điểm sự kiện nên model chỉ là **cross-sectional HasClaim association**, không phải xác suất underwriting tương lai.
-
-Đơn vị tiền SUSEP chưa được xác nhận đầy đủ; giao diện ghi **source units**, không gắn BRL. Năm 2023 của SUSEP chỉ có đến tháng 07, nên tổng năm đó là phần năm.
-
-## Cấu trúc repository
-
-```text
-dashboard/   Ứng dụng Dash, CSS, ảnh giao diện và sơ đồ kiến trúc
-pipeline/    Ingest, profiling, quality orchestration, ML, export và CLI
-database/    Migration V1–V14 và SQL benchmark
-infra/       Dockerfile và dependency riêng cho Dash/Airflow
-data/        Snapshot/evidence công khai; raw, model, output chỉ ở local
-tests/       Unit tests và kiểm tra trình duyệt
+```powershell
+docker compose --profile analytics up -d --build dashboard
 ```
 
-`docker-compose.yml` ở root để nhìn thấy ngay cách chạy hệ thống; Dockerfile ở `infra/`. `data/` là nơi đặt **file đầu vào/đầu ra**; `database/` là **mã SQL tạo và nâng cấp database**. Dữ liệu SQL thật nằm trong named volume `sqlserver_data` tại `/var/opt/mssql`, không nằm trong hai thư mục đó. `airflow_state` giữ metadata SQLite local của Airflow; `airflow_logs` giữ task logs. `data/raw` và `data/models` được mount chỉ đọc vào container cần dùng.
+Compose requires `SQLSERVER_SA_PASSWORD` in `.env` for configuration interpolation even when you start only the dashboard profile. Dash binds to **127.0.0.1:8050**, Airflow to **127.0.0.1:8080**, and SQL Server to **127.0.0.1:1433**. Only one dashboard process should use port 8050.
 
-`docker compose stop` chỉ dừng service; `docker compose down` giữ named volumes mặc định. **Không dùng `docker compose down -v` nếu cần giữ database.** Giữ cùng Compose project name khi khởi động lại để dùng đúng volume; Git không phải bản backup SQL.
+## Data contract and interpretation
 
-## Kết quả và kiểm chứng
+- **SUSEP:** the CSV header must be `company_code,company_name,year_month,product,state,premiums,claims,claim_premium_ratio`. Each row is a company/month/product/state aggregate. Raw text remains available for audit; analyzed numeric values use a documented decimal rounding policy. Source `claim_premium_ratio` may be `NA`; the dashboard computes its displayed ratio as `SUM(claims) / SUM(premiums)` when total premiums are positive. The monetary unit has not been fully verified, so charts say **source units**, not BRL.
+- **brvehins1:** 23 source fields describe driver, vehicle, geography, exposure, premium, and five claim groups. Each row is an **aggregate risk observation**, not necessarily one customer, policy, or claim event. `HasClaim` is true when the sum of the five `ClaimNb*` fields is positive. Claims/exposure is a claim-count frequency when exposure is positive. Identical source values retain separate lineage.
+- **Model:** features are `Gender`, `DrivAge`, `VehYear`, `VehModel`, `VehGroup`, `Area`, and `StateAb`. The bounded sample has **100,004** rows, including a **20,000**-row held-out test set. Splitting by `SourceRecordHash` limits leakage from repeated records. There is no event timestamp in Track B, so the current model measures cross-sectional `HasClaim` association rather than prospective claim risk.
 
-- **11/11/2026:** staging và fact khớp 8.338.214 dòng Track A và 1.965.355 dòng Track B; hai SQL quality gate PASS. Airflow `dags test` hoàn tất **12/12 task**, là lần chạy kiểm thử CLI, không phải scheduler production.
-- **09/2026, model held-out lịch sử:** ROC-AUC **0,808815**, Average Precision **0,513523**, positive prevalence **18,845%** trên 20.000 dòng. Đây là số đo của artifact hiện có, không phải kết quả train mới hoặc metric theo filter dashboard.
-- **24/09/2026, benchmark SQL lịch sử:** hai covering indexes giảm logical reads **98,94%** và **98,82%** cho hai workload SUSEP đã đo; cần thêm khoảng **924,51 MB** index và chi phí ghi. Không suy rộng sang mọi truy vấn.
-- **11/11/2026, giao diện:** 5 unit tests và kiểm tra Edge/Playwright trên desktop/mobile, bộ lọc, CSV, PNG và health endpoint PASS. Snapshot có `exported_at_utc`; xem chính thời điểm đó trên dashboard để biết độ mới của số liệu.
+## Repository layout and storage
 
-Chạy lại phần kiểm tra có thể thực hiện local:
+```text
+dashboard/   Dash app, styling, technology diagram, banner, and chart images
+pipeline/    Ingestion, validation, quality operations, ML, export, Airflow DAG, CLI
+database/    Versioned SQL migrations V1–V14 and benchmark SQL
+infra/       Dockerfiles and service-specific dependencies
+data/        Public aggregate snapshot and evidence; private raw/model/output locally
+tests/       Unit and browser checks
+```
+
+`docker-compose.yml` stays at the root as the system entry point. `database/` holds **SQL code** that creates and upgrades the database; `data/` holds **files** used or produced by the project. SQL Server's actual database files live in the Docker named volume `sqlserver_data` at `/var/opt/mssql`, not in either repository folder. `airflow_state` holds local Airflow metadata and `airflow_logs` holds task logs. Raw and model folders are mounted read-only into containers that need them.
+
+`docker compose stop` stops services. `docker compose down` keeps named volumes by default. Keep the same Compose project name to reuse the existing SQL volume, and avoid `docker compose down -v` when the database must be preserved. Git is not a backup of SQL data.
+
+## Verification and known limits
+
+The latest recorded warehouse checks on **11 November 2026** reconciled staging and fact row counts for both tracks (**8,338,214** and **1,965,355**) and passed two SQL quality gates. An Airflow `dags test` run completed **12/12 tasks**; it was a CLI test run. The model metrics and SQL benchmark above are **historical September 2026** results, not measurements repeated by this README update. The dashboard snapshot carries `exported_at_utc` so users can see its age.
+
+Run static validation and unit tests locally:
 
 ```powershell
 .venv\Scripts\python.exe -m pip install -r requirements-dev.txt
@@ -165,8 +192,8 @@ Chạy lại phần kiểm tra có thể thực hiện local:
 docker compose --profile analytics --profile orchestration config -q
 ```
 
-Khi app đã chạy và có Microsoft Edge, dùng `.venv\Scripts\python.exe tests/browser_check.py` để kiểm giao diện. `data/evidence.json` giữ evidence máy đọc của các lần chạy đã ghi; các phép đo lịch sử không được xem là phép đo mới. Chưa nghiệm thu fresh rebuild/restore cô lập, dashboard chưa có auth/RBAC, Airflow dùng standalone/SQLite cho local.
+With the app running and Microsoft Edge installed, `.venv\Scripts\python.exe tests/browser_check.py` checks the three pages, filters, resets, downloads, responsive widths, and health endpoint. `data/evidence.json` records older machine-readable evidence. A fresh isolated SQL rebuild/restore has not been validated, the dashboard has no authentication or RBAC, and local Airflow is not configured as a production deployment.
 
-## Giấy phép và dữ liệu
+## License
 
-Mã nguồn theo [LICENSE](LICENSE). `.env`, CSV gốc, model binary, runtime output và venv không được đưa lên Git. Dùng dữ liệu nguồn theo quyền của nơi cung cấp; snapshot đi kèm chỉ gồm aggregate phục vụ trình diễn.
+Code is covered by [LICENSE](LICENSE). `.env`, raw CSVs, trained model binaries, generated runtime output, and virtual environments stay outside Git. Check the source providers' terms before redistributing source data; the bundled dashboard file contains aggregates for demonstration.

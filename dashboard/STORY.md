@@ -2,6 +2,8 @@
 
 Tài liệu này giải thích **ba trang của ứng dụng Plotly Dash** theo cách có thể trình bày khi vấn đáp. Giao diện viết bằng tiếng Anh; tài liệu này viết bằng tiếng Việt để dễ học. Các con số ví dụ lấy từ snapshot SQL xuất ngày **11/11/2026** (`data/dashboard.json`), ở bộ lọc mặc định **All states** và toàn bộ khoảng thời gian. Đổi bộ lọc thì phải đọc lại số trên giao diện. Dashboard không truy vấn SQL trực tiếp mỗi khi tương tác.
 
+Cơ sở lựa chọn biểu đồ, dẫn trang PDF, audit và các quyết định giữ/sửa nằm trong [VISUALIZATION_GUIDE](../docs/VISUALIZATION_GUIDE.md). Tài liệu này tập trung vào cách đọc dữ liệu và kể câu chuyện; không thay thế phần lý thuyết đó.
+
 ## Câu chuyện chung: dữ liệu có nguồn gốc → hiểu hiện tượng → kiểm giới hạn
 
 1. **Market:** phí bảo hiểm và claims thay đổi thế nào; phần lớn premium nằm ở công ty và sản phẩm nào?
@@ -44,6 +46,8 @@ Hai nguồn **không có khóa join theo từng bản ghi**. Vì vậy ba trang 
 
 **Câu kết cho trang:** “Premium tăng và tập trung ở một số công ty/dòng sản phẩm. Tỷ lệ claims/premiums là một chỉ báo tổng hợp cần theo dõi theo thời gian; ba biểu đồ cho biết *bao nhiêu, khi nào, và tập trung ở đâu*, chứ chưa giải thích nguyên nhân.”
 
+Trong app có đoạn nối câu chuyện tự thay theo filter: mặc định top 10 công ty chiếm **63,2%**, top 8 dòng sản phẩm chiếm **74,3%** toàn premium đang chọn. Mẫu số là **tất cả premium của selection**, không chỉ tổng top-N. Đường premium là navy liền, claim là cam đứt; legend nằm trong chart nên vẫn đi cùng file PNG. Nhãn và đơn vị vẫn cần đọc dù đã phân biệt màu.
+
 ## Trang 2 — Motor risk & ML
 
 **Câu hỏi lớn:** Claim quan sát phân bố thế nào trong dữ liệu motor, và model score liên hệ ra sao với `HasClaim` trên mẫu kiểm thử?
@@ -52,7 +56,9 @@ Trang này có **hai population khác nhau**. KPI `Risk observations`, `Total ex
 
 **Trình tự đọc:** quy mô/exposure → tỷ lệ `HasClaim` theo tuổi → cấu trúc nhãn hồ sơ → phân bố score → tỷ lệ `HasClaim` quan sát theo score. Không cộng tổng các nhóm score với 1.965.355 quan sát warehouse.
 
-### KPI ở đầu trang
+Giao diện nay chia thành **01 / Observed portfolio** và **02 / Held-out evaluation** theo đúng trình tự này. Ba KPI đầu đi cùng warehouse; `Mean model score` nằm riêng trong phần held-out, kèm cỡ mẫu đang lọc. Chọn bang có thể làm hai cỡ mẫu thay đổi khác nhau; đó là hai population có sẵn, không phải mất dữ liệu hay join sai.
+
+### KPI trong hai phần của trang
 
 - `Risk observations`: số dòng quan sát rủi ro tổng hợp trong warehouse; không đồng nghĩa số khách hàng hay hợp đồng.
 - `Total exposure`: tổng `ExposTotal` của nguồn, mặc định khoảng **6,26 triệu source units**. Không phải số lượng dòng.
@@ -65,11 +71,15 @@ Trang này có **hai population khác nhau**. KPI `Risk observations`, `Total ex
 
 **Insight mặc định:** Nhóm **36–45** khoảng **19,9%**, nhóm **18–25** khoảng **16,6%**. Đây là quan hệ mô tả ở dữ liệu quan sát. Không kết luận tuổi *gây ra* claim hoặc so sánh công bằng giữa nhóm khi chưa kiểm các yếu tố khác.
 
+Đường chấm là tỷ lệ `HasClaim` của **toàn warehouse đang lọc**, tính `SUM(has_claim)/SUM(observations)`, không lấy trung bình tỷ lệ các nhóm tuổi. Đường này giúp đọc nhóm cao/thấp hơn bối cảnh chung; không phải mục tiêu kinh doanh hoặc ranh giới chấp nhận bảo hiểm. Cam nhận diện observed claim, xám cho nhóm tuổi Unknown; hover có cả số HasClaim và số observation.
+
 ### Biểu đồ “The observation mix behind the analysis”
 
 **Trả lời:** Dữ liệu gồm bao nhiêu quan sát theo nhãn `Gender` của nguồn? Có Male, Female, Corporate và Unknown.
 
 **Insight mặc định:** Male khoảng **857.074**, Female **644.600**, Corporate **375.492**, Unknown **88.189** quan sát. Biểu đồ là **số lượng**, không phải tỷ lệ claim theo nhãn. Nó giúp người xem biết thành phần mẫu trước khi diễn giải các biểu đồ rủi ro.
+
+Các thanh count dùng xám trung tính, không phải trạng thái tốt/xấu. Hover cho cả số lượng và tỷ trọng trong warehouse đang lọc. Biểu đồ không được dùng để suy ra claim rate theo Gender, và không biến Corporate thành một giới tính cá nhân.
 
 ### Biểu đồ “Where model scores are concentrated”
 
@@ -77,11 +87,15 @@ Trang này có **hai population khác nhau**. KPI `Risk observations`, `Total ex
 
 **Insight mặc định:** **13.526/20.000 (67,6%)** score dưới 0,20. Phân bố nghiêng về score thấp; tự nó chưa chứng minh model chính xác hay sai. Đừng gọi đây là phân bố score của toàn bộ warehouse.
 
+Đây là **histogram của score liên tục đã tổng hợp thành bins**, không phải xếp hạng danh mục: 20 khoảng giữ thứ tự 0→1, mỗi khoảng rộng 0,05 và các thanh liền nhau. Khoảng không có mẫu vẫn hiện count 0. Tím đậm dưới 0,20 chỉ nhấn nhóm được mô tả trong headline; **0,20 không phải threshold phân lớp**. Không khôi phục score cá nhân hay quartiles từ hình này.
+
 ### Biểu đồ “How scores relate to observed claims”
 
-**Trả lời:** Trong từng khoảng score, tỷ lệ `HasClaim=1` thật có tăng cùng score không? Đường navy là tỷ lệ quan sát, đường cam đứt là score trung bình của khoảng.
+**Trả lời:** Trong từng khoảng score, tỷ lệ `HasClaim=1` thật có tăng cùng score không? Đường cam liền là tỷ lệ quan sát, đường tím đứt là score trung bình của khoảng. Trục X là **trung điểm khoảng score**, không phải score trung bình thật; score trung bình là giá trị đường tím trên trục Y, đổi sang thang % để so cùng hình.
 
 **Insight mặc định:** Gộp các khoảng dưới 0,20 cho **8,8%** `HasClaim`; gộp từ 0,50 trở lên cho **69,9%** trên **1.091** quan sát. Điều này cho thấy score phân tách nhóm trên **tập held-out**, không bảo đảm xác suất claim ở tương lai. Các khoảng cao có ít quan sát hơn nên đường có thể dao động. ROC-AUC **0,808815** và AP **0,513523** là kết quả lịch sử tháng 09/2026 trên 20.000 dòng, không phải đo mới sau khi đổi filter.
+
+Hover hiện biên khoảng, số observation và số HasClaim thật. Nếu một bang không có mẫu trong một bin thì hai đường có **khoảng ngắt**, không tự gán tỷ lệ 0 hoặc nối qua bin vắng. Đoạn insight dưới hai chart lấy cùng held-out để nối phân bố score với claim quan sát; không suy thành so sánh tuổi của warehouse.
 
 **Câu kết cho trang:** “Nguồn motor có khác biệt claim quan sát theo nhóm tuổi và cấu trúc hồ sơ. Trên mẫu held-out riêng, score cao đi kèm tỷ lệ `HasClaim` quan sát cao hơn. Đây là phân tích mô tả và đánh giá cắt ngang; chưa thể dùng như xác suất bồi thường tương lai.”
 
@@ -106,9 +120,11 @@ Trang này có **hai population khác nhau**. KPI `Risk observations`, `Total ex
 
 ### Biểu đồ “Fewer reads, with an explicit storage cost”
 
-**Trả lời:** Hai covering indexes làm thay đổi số logical reads của hai workload SUSEP đã đo như thế nào? Trục ngang dùng **thang log**, thanh nhạt là trước index, thanh teal là sau index.
+**Trả lời:** Hai covering indexes làm thay đổi số logical reads của hai workload SUSEP đã đo như thế nào? Trục ngang dùng **thang tuyến tính bắt đầu từ 0**, thanh xám là trước index, thanh teal là sau index. Q1 là company/month; Q2 là state/product/month, có tên đầy đủ ở phần số liệu bên cạnh và hover.
 
 **Insight lịch sử:** workload công ty/tháng từ **317.528 → 3.364** logical reads (**−98,94%**); state/sản phẩm/tháng từ **317.528 → 3.734** (**−98,82%**). Đổi lại khoảng **924,51 MB** index và thêm chi phí ghi. Đó không phải lời hứa mọi truy vấn nhanh hơn 99%, cũng không đo tốc độ end-to-end của dashboard (Dash đọc JSON snapshot, không gọi SQL khi đổi filter).
+
+Thanh sau index rất ngắn là **đúng độ lớn**, không phải lỗi hiển thị. Nhãn exact giúp đọc số nhỏ. Không kéo dài thanh bằng log axis, vì người xem bar thường so chiều dài từ gốc; lựa chọn này bám nguyên tắc bar từ 0 ở C2 p35. Không dùng % giảm logical reads để nói elapsed time cũng giảm cùng mức.
 
 **Câu kết cho trang:** “Tôi cho xem các aggregate thật thay vì chỉ số tổng, giữ mốc xuất dữ liệu để truy vết, và trình bày cả lợi ích đọc SQL lẫn chi phí lưu/ghi của index. Đối soát số dòng cho biết tính đầy đủ ở một mức; quality gates SQL mới kiểm sâu hơn.”
 

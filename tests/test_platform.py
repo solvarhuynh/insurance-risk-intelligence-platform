@@ -37,14 +37,23 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual(set(segments.state), {"SP"})
         self.assertEqual(set(scores.state), {"SP"})
         self.assertLess(scores.observations.sum(), 20_000)
-        self.assertEqual(len(update_risk("UNKNOWN_STATE")), 5)
+        empty = update_risk("UNKNOWN_STATE")
+        self.assertEqual(len(empty[1].data[0].y), 0)
+        self.assertEqual(empty[-1], "No held-out scores match this selection")
 
     def test_ratio_and_callback_figures(self):
         self.assertIsNone(ratio(4, 0))
         self.assertIsNone(ratio(4, -1))
         self.assertEqual(ratio(4, 8), .5)
-        self.assertEqual(len(update_market("SP", [2020, 2021])), 4)
-        self.assertEqual(len(update_risk("SP")), 5)
+        monthly = update_market("SP", [2020, 2021])
+        annual = update_market("SP", [2020, 2021], "annual")
+        source = market_frames("SP", [2020, 2021])[0]
+        self.assertEqual(len(monthly[1].data[0].y), 24)
+        self.assertEqual(len(annual[1].data[0].y), 2)
+        for result in (monthly, annual):
+            self.assertAlmostEqual(sum(result[1].data[0].y), source.premium.sum() / 1e9, places=6)
+        risk = update_risk("SP")
+        self.assertEqual(sum(risk[1].data[0].y), risk_frames("SP")[1].observations.sum())
 
     def test_numeric_migration_order_and_go_boundary(self):
         self.assertEqual([int(p.name.split("__")[0][1:]) for p in migration_paths()], list(range(1, 15)))

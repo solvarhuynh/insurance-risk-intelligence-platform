@@ -6,4 +6,4 @@ COPY dashboard /app/dashboard
 RUN useradd --create-home appuser
 USER appuser
 EXPOSE 8050
-CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "2", "--threads", "4", "--timeout", "60", "dashboard.app:server"]
+CMD ["gunicorn", "--bind", "0.0.0.0:8050", "--workers", "2", "--timeout", "60", "dashboard.app:server"]

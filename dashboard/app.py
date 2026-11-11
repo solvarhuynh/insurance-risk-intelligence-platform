@@ -352,16 +352,15 @@ def navigation_label(symbol, title):
 
 app.layout = html.Div([
     html.A("Skip to content", href="#page-content", className="skip-link"),
-    html.Aside([
+    html.Header(html.Div([
         html.A([html.Span(icon("shield"), className="brand-mark"),
                 html.Div([html.Strong("Insurance"), html.Span("INTELLIGENCE")])], href="/", className="brand"),
-        html.Div("EXPLORE", className="nav-label"),
         html.Nav(dcc.RadioItems(id="section", value="market", options=[
             {"label": navigation_label("grid", "Market"), "value": "market"},
             {"label": navigation_label("risk", "Motor risk"), "value": "risk"},
             {"label": navigation_label("database", "Data"), "value": "platform"},
         ], className="nav-items"), **{"aria-label": "Analytics sections"}),
-    ], className="sidebar"),
+    ], className="header-inner"), className="app-header"),
     html.Main([
         html.Header([html.Div([html.Span("Workspace"), html.Span("/", className="breadcrumb-divider"), html.Strong("Insurance analytics")], className="breadcrumb"),
                      html.Div(id="source-meta")], className="topbar"),

@@ -16,7 +16,7 @@ def csv_download(page, button):
 
 def check(base_url: str, screenshot: bool) -> None:
     errors = []
-    labels = ("Market overview", "Motor risk & ML", "Data & performance")
+    labels = ("Market", "Motor risk", "Data")
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch(channel="msedge", headless=True)
         page = browser.new_page(viewport={"width": 1440, "height": 1000}, device_scale_factor=1)
@@ -27,6 +27,9 @@ def check(base_url: str, screenshot: bool) -> None:
         expect(page.locator("#market-metrics .metric strong").first).to_have_text("3.05T")
         expect(page.locator("#market-takeaway")).to_contain_text("24.1%")
         assert page.locator("html").get_attribute("lang") == "en"
+        assert page.locator(".sidebar-footer, .nav-copy, .nav-number").count() == 0
+        assert page.evaluate("getComputedStyle(document.querySelector('.metric')).textAlign") == "center"
+        assert int(page.evaluate("getComputedStyle(document.querySelector('.brand div > span')).fontWeight")) >= 700
         page.evaluate("document.fonts.ready")
         assert page.evaluate("document.fonts.check('500 14px Inter')")
         assert page.locator("#market-trend .main-svg").count() > 0
@@ -91,12 +94,24 @@ def check(base_url: str, screenshot: bool) -> None:
         expect(page.locator(".chart-card").filter(has=page.locator("#risk-distribution"))).to_contain_text("not validated future claim probabilities")
 
         page.locator("#section label").filter(has_text=labels[2]).click()
-        page.get_by_role("heading", name="Quality you can trace", exact=True).wait_for()
-        assert page.locator(".reconcile-status").all_text_contents() == ["Matched", "Matched"]
+        page.get_by_role("heading", name="See the data behind the platform", exact=True).wait_for()
+        expect(page.locator("#data-count")).to_have_text("6,669 aggregate rows")
+        assert page.locator("#data-table tbody tr").count() == 15
+        expect(page.locator("#data-table tbody tr").first).to_contain_text("2023-07")
+        page.locator("#data-next").click()
+        expect(page.locator("#data-page-status")).to_contain_text("Page 2")
+        page.locator("#data-track label").filter(has_text="Motor risk").click()
+        expect(page.locator("#data-count")).to_have_text("644 aggregate rows")
+        expect(page.locator("#data-table thead")).to_contain_text("HasClaim share")
+        expect(page.locator("#data-page-status")).to_contain_text("Page 1")
+        page.locator("#data-state input").fill("SP")
+        page.get_by_text("SP · São Paulo", exact=True).click()
+        page.wait_for_function("[...document.querySelectorAll('#data-table tbody tr')].every(row => row.cells[0].textContent === 'SP')")
+        assert page.locator("#data-prev").is_disabled()
         expect(page.locator(".benchmark-card")).to_contain_text("24 September 2026")
         for width in (390, 768, 1024, 1440, 1920):
             page.set_viewport_size({"width": width, "height": 1000})
-            for label, title in zip(labels, ("Insurance market overview", "Motor risk & model insights", "Quality you can trace")):
+            for label, title in zip(labels, ("Insurance market overview", "Motor risk & model insights", "See the data behind the platform")):
                 page.locator("#section label").filter(has_text=label).click()
                 page.get_by_role("heading", name=title, exact=True).wait_for()
                 page.locator(".chart .main-svg").first.wait_for()

@@ -10,8 +10,8 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "pipeline"))
 
-from dashboard.app import market_change, ratio, update_market, update_risk
-from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot
+from dashboard.app import explorer_page, market_change, ratio, update_market, update_risk
+from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
 from manage import migration_paths, sql_batches
 
 
@@ -78,6 +78,21 @@ class PlatformTests(unittest.TestCase):
         with patch("dashboard.data.table", return_value=previous.iloc[[0]]):
             self.assertEqual(latest_market_comparison(current, "SP"), {})
         self.assertEqual(latest_market_comparison(current.iloc[:0], "SP"), {})
+
+    def test_data_explorer_pages_real_aggregate_rows(self):
+        headings, rows, total, page, pages = explorer_page("market")
+        self.assertEqual(total, len(table("market", "monthly")))
+        self.assertEqual((page, len(rows), rows[0][:2]), (0, 15, ["2023-07", "AC"]))
+        self.assertIn("Claims / premiums", headings)
+        self.assertGreater(pages, 1)
+        _, filtered, filtered_total, last, _ = explorer_page("market", "SP", 99999)
+        self.assertTrue(filtered_total > 0 and all(row[1] == "SP" for row in filtered))
+        self.assertTrue(last < 99999)
+        headings, rows, total, _, _ = explorer_page("risk")
+        self.assertEqual(total, len(table("risk", "segments")))
+        self.assertEqual(len(rows), 15)
+        self.assertIn("HasClaim share", headings)
+        self.assertNotIn("PolicyId", headings)
 
 
 if __name__ == "__main__":

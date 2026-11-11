@@ -2,13 +2,16 @@
 import sys
 import unittest
 from pathlib import Path
+from unittest.mock import patch
+
+import pandas as pd
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "pipeline"))
 
-from dashboard.app import ratio, update_market, update_risk
-from dashboard.data import market_frames, risk_frames, snapshot
+from dashboard.app import market_change, ratio, update_market, update_risk
+from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot
 from manage import migration_paths, sql_batches
 
 
@@ -58,6 +61,23 @@ class PlatformTests(unittest.TestCase):
     def test_numeric_migration_order_and_go_boundary(self):
         self.assertEqual([int(p.name.split("__")[0][1:]) for p in migration_paths()], list(range(1, 15)))
         self.assertEqual(sql_batches("SELECT 'GO';\nGO\nSELECT 2;\nGO -- comment\n"), ["SELECT 'GO';", "SELECT 2;"])
+
+    def test_latest_year_comparison_matches_months_and_geography(self):
+        current = pd.DataFrame({"month": ["2023-01-01", "2023-02-01"], "year": [2023, 2023],
+                                "premium": [100., 200.], "claims": [50., 100.]})
+        previous = pd.DataFrame({"month": ["2022-01-01", "2022-02-01", "2022-03-01", "2022-01-01"],
+                                 "state": ["SP", "SP", "SP", "RJ"], "premium": [200., 200., 99999., 99999.],
+                                 "claims": [40., 40., 0., 0.]})
+        with patch("dashboard.data.table", return_value=previous):
+            comparison = latest_market_comparison(current, "SP")
+        self.assertEqual(comparison["period"], "Jan–Feb 2023 vs 2022")
+        self.assertAlmostEqual(comparison["premium_change"], -25)
+        self.assertAlmostEqual(comparison["ratio_change_pp"], 30)
+        self.assertIn("negative", market_change(comparison, "premium_change").children[0].className)
+        self.assertIn("negative", market_change(comparison, "ratio_change_pp", lower_is_better=True).children[0].className)
+        with patch("dashboard.data.table", return_value=previous.iloc[[0]]):
+            self.assertEqual(latest_market_comparison(current, "SP"), {})
+        self.assertEqual(latest_market_comparison(current.iloc[:0], "SP"), {})
 
 
 if __name__ == "__main__":

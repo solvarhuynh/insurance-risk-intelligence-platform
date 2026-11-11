@@ -31,6 +31,12 @@ def check(base_url: str, screenshot: bool) -> None:
         assert page.evaluate("document.fonts.check('500 14px Inter')")
         assert page.locator("#market-trend .main-svg").count() > 0
         assert page.locator("#market-trend").bounding_box()["height"] >= 290
+        assert page.locator(".sidebar-data, .reading-note, .scope-note, .workspace footer").count() == 0
+        assert page.locator("#market-metrics .metric-change.positive").count() == 2
+        expect(page.locator("#market-metrics")).to_contain_text("Jan–Jul 2023 vs 2022")
+        assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticklabelstandoff") == 18
+        assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticktext.every(t => !t.includes('<br>'))")
+        assert page.locator(".chart-card").filter(has=page.locator("#market-products")).locator(".chart-footnote").count() == 0
         if screenshot:
             page.screenshot(path=str(Path(__file__).resolve().parents[1] / "dashboard/assets/preview.png"), full_page=True)
         page.locator("#market-trend").hover()
@@ -48,6 +54,7 @@ def check(base_url: str, screenshot: bool) -> None:
         page.locator("#market-state input").fill("SP")
         page.get_by_text("SP · São Paulo", exact=True).click()
         expect(page.locator("#market-metrics")).to_contain_text("SP")
+        expect(page.locator("#market-metrics .metric-change.negative")).to_contain_text("+1.7 pp")
         assert before != page.locator("#market-metrics").inner_text()
         handle = page.locator("#market-years .rc-slider-handle-1")
         position = handle.bounding_box()
@@ -80,8 +87,8 @@ def check(base_url: str, screenshot: bool) -> None:
         assert "Không rõ" not in str(risk_rows)
         page.locator("#risk-reset").click()
         expect(page.locator("#risk-takeaway")).to_contain_text("67.6%")
-        page.locator(".reading-note summary").click()
-        assert page.locator(".reading-note").get_attribute("open") is not None
+        assert page.locator(".sidebar-data, .reading-note, .scope-note, .workspace footer").count() == 0
+        expect(page.locator(".chart-card").filter(has=page.locator("#risk-distribution"))).to_contain_text("not validated future claim probabilities")
 
         page.locator("#section label").filter(has_text=labels[2]).click()
         page.get_by_role("heading", name="Quality you can trace", exact=True).wait_for()

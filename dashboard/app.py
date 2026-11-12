@@ -378,7 +378,7 @@ app.layout = html.Div([
             {"label": navigation_label("grid", "Market"), "value": "market"},
             {"label": navigation_label("risk", "Motor risk"), "value": "risk"},
             {"label": navigation_label("database", "Data"), "value": "platform"},
-        ], className="nav-items"), **{"aria-label": "Analytics sections"}),
+        ], className="nav-items", labelStyle={"display": "flex"}), **{"aria-label": "Analytics sections"}),
     ], className="header-inner"), className="app-header"),
     html.Main([
         html.Header([html.Div([html.Span("RESEARCH DESK"), html.Span("/", className="breadcrumb-divider"), html.Strong("BRAZIL · INSURANCE")], className="breadcrumb"),

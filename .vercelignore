@@ -1,0 +1,22 @@
+# Deploy only the Dash function, its UI files, and the public aggregate snapshot.
+/*
+!api/
+!dashboard/
+!data/
+!vercel.json
+!.python-version
+
+api/*
+!api/index.py
+!api/requirements.txt
+
+dashboard/*
+!dashboard/app.py
+!dashboard/data.py
+!dashboard/assets/
+dashboard/assets/*
+!dashboard/assets/style.css
+!dashboard/assets/inter.woff2
+
+data/*
+!data/dashboard.json

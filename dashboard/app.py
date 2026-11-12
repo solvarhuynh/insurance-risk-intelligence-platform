@@ -11,7 +11,7 @@ import pandas as pd
 import plotly.graph_objects as go
 from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 
-from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
+from dashboard.data import market_frames, market_range_comparison, risk_frames, snapshot, table
 
 BLUE, TEAL, ORANGE, INK, MUTED = "#164b43", "#23756c", "#b66743", "#243b35", "#66766f"
 SCORE, CONTEXT = "#75668d", "#a8b9b1"
@@ -107,7 +107,7 @@ def market_change(comparison, key, *, lower_is_better=False):
     meaning = {"premium_change": "Premium volume", "claims_change": "Claim volume",
                "ratio_change_pp": "Claims / premiums", "observations_change": "Reported rows"}[key]
     return html.Div([
-        html.Span(f"{arrow} {display_change}{unit} · latest year", className=f"metric-change {tone}"),
+        html.Span(f"{arrow} {display_change}{unit}", className=f"metric-change {tone}"),
         html.Span(comparison["period"], className="comparison-period"),
     ], className="metric-comparison", title=f"{meaning} change. Color and arrow show numerical direction, not business performance. Same calendar months: {comparison['period']}. Totals above cover the selected range.")
 
@@ -470,7 +470,7 @@ def update_market(state, years, grain="monthly"):
     monthly, companies, products = market_frames(state, years)
     premium, claims = monthly["premium"].sum(), monthly["claims"].sum()
     claim_ratio, observations = ratio(claims, premium), int(monthly["observations"].sum())
-    comparison = latest_market_comparison(monthly, state)
+    comparison = market_range_comparison(monthly, state, years)
     cards = [
         metric("Total premiums", number(premium), "Source units · selected period", symbol="premium", exact=f"{premium:,.2f}",
                tone=market_tone(comparison, "premium_change"),

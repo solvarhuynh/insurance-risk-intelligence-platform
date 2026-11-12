@@ -37,12 +37,12 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         assert page.locator("#market-trend .main-svg").count() > 0
         assert page.locator("#market-trend").bounding_box()["height"] >= 290
         assert page.locator(".sidebar-data, .reading-note, .scope-note, .workspace footer").count() == 0
-        for index, expected, tone in ((0, "▲ +8.9%", "positive"), (1, "▼ -11.9%", "negative"),
-                                      (2, "▼ -4.9 pp", "negative"), (3, "▼ -13.0%", "negative")):
+        for index, expected, tone in ((0, "▲ +1056.1%", "positive"), (1, "▲ +413.5%", "positive"),
+                                      (2, "▼ -25.9 pp", "negative"), (3, "▲ +127.4%", "positive")):
             card = page.locator("#market-metrics .metric").nth(index)
             expect(card.locator(f".metric-change.{tone}")).to_contain_text(expected)
             assert tone in card.get_attribute("class")
-        expect(page.locator("#market-metrics")).to_contain_text("Jan–Jul 2023 vs 2022")
+        expect(page.locator("#market-metrics")).to_contain_text("Jan–Jul 2023 vs Jan–Jul 2003")
         assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticklabelstandoff") == 18
         assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticktext.every(t => !t.includes('<br>'))")
         assert page.locator(".chart-card").filter(has=page.locator("#market-products")).locator(".chart-footnote").count() == 0
@@ -63,8 +63,9 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         page.locator("#market-state input").fill("SP")
         page.get_by_text("SP · São Paulo", exact=True).click()
         expect(page.locator("#market-metrics")).to_contain_text("SP")
-        expect(page.locator("#market-metrics .metric-change.positive").filter(has_text="+1.7 pp")).to_contain_text("▲ +1.7 pp")
+        expect(page.locator("#market-metrics .metric-change.negative").filter(has_text="-21.3 pp")).to_contain_text("▼ -21.3 pp")
         assert before != page.locator("#market-metrics").inner_text()
+        start_badge = page.locator("#market-metrics .metric-change").first.inner_text()
         handle = page.locator("#market-years .rc-slider-handle-1")
         position = handle.bounding_box()
         rail = page.locator("#market-years .rc-slider-rail").bounding_box()
@@ -74,12 +75,14 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         page.mouse.up()
         year = int(handle.get_attribute("aria-valuenow"))
         assert year > 2003
-        expect(page.locator("#market-metrics")).to_contain_text(str(year))
+        expect(page.locator("#market-metrics .comparison-period").first).to_have_text(f"Jan–Jul 2023 vs Jan–Jul {year}")
+        assert start_badge != page.locator("#market-metrics .metric-change").first.inner_text()
         market_rows = csv_download(page, "#market-export")
         assert market_rows and {row["state"] for row in market_rows} == {"SP"}
         assert all(year <= int(row["month"][:4]) <= 2023 for row in market_rows)
         page.locator("#market-reset").click()
         expect(page.locator("#market-metrics .metric strong").first).to_have_text("3.05T")
+        expect(page.locator("#market-metrics .comparison-period").first).to_have_text("Jan–Jul 2023 vs Jan–Jul 2003")
         assert handle.get_attribute("aria-valuenow") == "2003"
 
         page.locator("#section label").filter(has_text=labels[1]).click()

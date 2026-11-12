@@ -11,7 +11,7 @@ sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "pipeline"))
 
 from dashboard.app import explorer_page, market_change, platform_page, ratio, update_market, update_risk
-from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
+from dashboard.data import market_frames, market_range_comparison, risk_frames, snapshot, table
 from manage import migration_paths, sql_batches
 
 
@@ -62,15 +62,15 @@ class PlatformTests(unittest.TestCase):
         self.assertEqual([int(p.name.split("__")[0][1:]) for p in migration_paths()], list(range(1, 15)))
         self.assertEqual(sql_batches("SELECT 'GO';\nGO\nSELECT 2;\nGO -- comment\n"), ["SELECT 'GO';", "SELECT 2;"])
 
-    def test_latest_year_comparison_matches_months_and_geography(self):
+    def test_single_year_comparison_matches_months_and_geography(self):
         current = pd.DataFrame({"month": ["2023-01-01", "2023-02-01"], "year": [2023, 2023],
                                 "premium": [100., 200.], "claims": [50., 100.], "observations": [20, 30]})
         previous = pd.DataFrame({"month": ["2022-01-01", "2022-02-01", "2022-03-01", "2022-01-01"],
                                  "state": ["SP", "SP", "SP", "RJ"], "premium": [200., 200., 99999., 99999.],
                                  "claims": [40., 40., 0., 0.], "observations": [10, 10, 999, 999]})
         with patch("dashboard.data.table", return_value=previous):
-            comparison = latest_market_comparison(current, "SP")
-        self.assertEqual(comparison["period"], "Jan–Feb 2023 vs 2022")
+            comparison = market_range_comparison(current, "SP")
+        self.assertEqual(comparison["period"], "Jan–Feb 2023 vs Jan–Feb 2022")
         self.assertAlmostEqual(comparison["premium_change"], -25)
         self.assertAlmostEqual(comparison["claims_change"], 87.5)
         self.assertAlmostEqual(comparison["ratio_change_pp"], 30)
@@ -85,8 +85,26 @@ class PlatformTests(unittest.TestCase):
         self.assertIn("neutral", unchanged.children[0].className)
         self.assertIn("● 0.0%", unchanged.children[0].children)
         with patch("dashboard.data.table", return_value=previous.iloc[[0]]):
-            self.assertEqual(latest_market_comparison(current, "SP"), {})
-        self.assertEqual(latest_market_comparison(current.iloc[:0], "SP"), {})
+            self.assertEqual(market_range_comparison(current, "SP"), {})
+        self.assertEqual(market_range_comparison(current.iloc[:0], "SP"), {})
+
+    def test_range_endpoint_comparison_changes_with_start_year(self):
+        early = market_range_comparison(market_frames("ALL", [2008, 2023])[0], "ALL")
+        later = market_range_comparison(market_frames("ALL", [2015, 2023])[0], "ALL")
+        self.assertEqual(early["period"], "Jan–Jul 2023 vs Jan–Jul 2008")
+        self.assertEqual(later["period"], "Jan–Jul 2023 vs Jan–Jul 2015")
+        self.assertAlmostEqual(early["premium_change"], 395.510896, places=5)
+        self.assertAlmostEqual(later["premium_change"], 81.280111, places=5)
+        self.assertNotEqual(early["claims_change"], later["claims_change"])
+        self.assertNotEqual(early["ratio_change_pp"], later["ratio_change_pp"])
+        self.assertNotEqual(early["observations_change"], later["observations_change"])
+        single = market_range_comparison(market_frames("ALL", [2023, 2023])[0], "ALL")
+        self.assertEqual(single["period"], "Jan–Jul 2023 vs Jan–Jul 2022")
+        self.assertEqual(market_range_comparison(market_frames("ALL", [2003, 2003])[0], "ALL"), {})
+        missing_start = market_frames("ALL", [2010, 2023])[0]
+        self.assertEqual(market_range_comparison(missing_start, "ALL", [2008, 2023]), {})
+        missing_end = market_frames("ALL", [2008, 2015])[0]
+        self.assertEqual(market_range_comparison(missing_end, "ALL", [2008, 2023]), {})
 
     def test_data_explorer_pages_real_aggregate_rows(self):
         headings, rows, total, page, pages = explorer_page("market")

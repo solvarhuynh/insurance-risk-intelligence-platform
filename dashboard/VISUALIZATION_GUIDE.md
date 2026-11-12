@@ -119,7 +119,7 @@ Các biến thể reference line, drop line, marker/line style là kỹ thuật 
 | M08 / hình và nét | Dùng nét đậm/nhạt, hình để thêm phân biệt | Hình vuông/tròn/tam giác, đường đậm | C2 p26–28 | EXPLICIT |
 | M09 / nền | Giảm nổi bật phần nền để thấy dữ liệu | Các đường bối cảnh nhạt, điểm trọng tâm rõ | C1 p17; C2 p27–28 | INFERRED cho màu nền/card UI |
 
-**Thiết kế triển khai của repo**, không phải palette bắt buộc của bài giảng: premium navy `#003366`; claim và observed HasClaim đất cam `#b66a45`; model score tím `#7560a6`; counts/context xám; sau index teal `#007c83`. Nền xanh xám/card trắng giữ theo yêu cầu owner. Nét đứt/marker, nhãn và tooltip bổ sung màu; việc chọn HEX hay kiểm tỷ lệ tương phản là quyết định kỹ thuật. Màu cam chỉ nhận diện đại lượng, không tự khẳng định “xấu”. Xanh/đỏ chỉ dùng khi có phép so sánh và hướng đánh giá đã nói rõ.
+**Thiết kế triển khai của repo**, không phải palette bắt buộc của bài giảng: premium xanh rừng `#164b43`; claim và observed HasClaim đất cam `#b66743`; model score tím `#75668d`; counts/context xám xanh; sau index teal `#23756c`. Nền giấy ấm và card trắng ngà theo giao diện Research Desk. Nét đứt/marker, nhãn và tooltip bổ sung màu; việc chọn HEX hay kiểm tỷ lệ tương phản là quyết định kỹ thuật. Màu cam chỉ nhận diện đại lượng, không tự khẳng định “xấu”. Riêng KPI Market, xanh/đỏ chỉ biểu diễn **chiều tăng/giảm số học** khi so cùng tháng với năm trước; màu tối khi không có so sánh hợp lệ hoặc thay đổi làm tròn bằng 0.
 
 ## 6. Bố cục, tương tác và storytelling
 
@@ -149,7 +149,7 @@ Audit ngày 11/11/2026, dựa vào `dashboard/app.py`, `data/dashboard.json`, `d
 
 | Trang / visual | Câu hỏi, dữ liệu, khả năng đọc | Vấn đề và mức | Quy tắc | Quyết định / đề xuất |
 |---|---|---|---|---|
-| Market / KPI | Tổng premium/claim, ratio of sums, số observation cùng filter | LOW: màu icon claim chưa trùng series; badge rõ cùng kỳ, không cần tạo thêm KPI xấu | V08,V24 | **REVISE** màu nhận diện; giữ công thức và so tháng tương ứng |
+| Market / KPI | Tổng premium/claim, ratio of sums, số observation cùng filter | LOW: cả bốn badge cần rõ cùng kỳ; màu tăng/giảm chỉ mô tả hướng số học | V08,V24 | **REVISE** màu nhận diện; giữ công thức và so tháng tương ứng |
 | Market / trend | Premium và claims biến động khi nào? Monthly/annual cùng population, cùng source units | MEDIUM: area fill không cần thiết, hai đường chỉ phân biệt bằng màu; legend ngoài chart không đi cùng PNG | V05,V07,V11,V18 | **REVISE** giữ line, bỏ fill, claim nét đứt, đưa legend trong plot; trục 0; hover nêu kỳ và partial year |
 | Market / company ranking | Công ty nào dẫn premium? 10 nhóm cùng filter, full name trên hover | LOW: chưa có tỷ trọng so toàn selection; trục số thiếu tên trong ảnh PNG | V10,V18,V20,V22 | **REVISE** bar ngang sorted; ghi đơn vị ở trục, % selection trong hover; không biến top10 thành toàn market |
 | Market / product ranking | Dòng nào tập trung premium? 8 nhóm, khác chiều company | LOW: tương tự company; hai chart bổ sung nhau, không phải trùng dữ liệu | V06,V10,V22 | **REVISE** giữ bar, mã nguồn/nhãn đầy đủ trong hover; không thay bằng pie thiếu phần còn lại |
@@ -177,7 +177,7 @@ Không có **CRITICAL** đã xác nhận. HIGH là nguy cơ diễn giải/encodi
 2. **Motor:** bối cảnh toàn warehouse → age và observation mix → bối cảnh mẫu held-out → histogram và observed-vs-score. Hai phần có tiêu đề/cỡ mẫu riêng, cùng geography filter nhưng denominator khác. Một câu insight kết nối phân bố score và quan sát theo score; mẫu nhỏ vẫn hiện cỡ mẫu.
 3. **Data:** counts/reconciliation → bảng aggregate → bằng chứng benchmark lịch sử và cost. Số liệu table/snapshot và benchmark dùng hai mốc thời gian riêng.
 
-Giữ Dash, snapshot, CSV/PNG, reset, filter session, sidebar ba mục tiếng Anh, KPI căn giữa và banner SVG của owner. Cải thiện typography/spacing có mục tiêu, không thay logo hay biến tài liệu thành đồ án môn học.
+Giữ Dash, snapshot, CSV/PNG, reset, filter session, header ngang ba mục tiếng Anh, KPI căn giữa và banner SVG của owner. Cải thiện typography/spacing có mục tiêu, không thay logo hay biến tài liệu thành đồ án môn học.
 
 **Backup trước sửa code:** `D:\insurance-platform-archive-20261111\lecture-review\before-redesign.zip`, gồm README đang có phần engineering chưa commit, dashboard/assets, tests và aggregate evidence; không gồm `.env`/raw/model binary. Hash snapshot/evidence/model được ghi ngoài Git để đối chiếu sau sửa. Tài liệu này được tạo trước chỉnh app; mục nghiệm thu bên dưới chỉ cập nhật sau khi chạy thật.
 

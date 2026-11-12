@@ -24,11 +24,11 @@ Hai nguồn **không có khóa join theo từng bản ghi**. Vì vậy ba trang 
 - `Total claims`: tổng claims báo cáo, khoảng **735,52 tỷ**. Đây là số tiền tổng hợp của nguồn, không phải số claim event.
 - `Claims / premiums`: lấy **tổng claims chia tổng premiums** khi mẫu số dương; mặc định **24,1%**. Không phải lợi nhuận hay loss ratio được chuẩn hóa theo mọi loại sản phẩm.
 - `Market observations`: **8.338.214** dòng fact ở bộ lọc mặc định. Một dòng là công ty × tháng × sản phẩm × bang.
-- Badge biến động so **cùng các tháng của năm cuối được chọn với năm trước**, cùng bang. Với 2023, chỉ so tháng 01–07 với 01–07/2022: premium **▲ +8,9%** màu xanh, tỷ lệ claims/premiums **▼ −4,9 điểm phần trăm** màu đỏ. Màu và tam giác chỉ diễn đạt **chiều tăng/giảm**, không chứng minh tốt/xấu về kinh doanh.
+- Cả bốn badge biến động so **cùng các tháng của năm cuối được chọn với năm trước**, cùng bang. Với 2023, chỉ so tháng 01–07 với 01–07/2022: premium **▲ +8,9%** xanh, claims **▼ −11,9%** đỏ, tỷ lệ claims/premiums **▼ −4,9 điểm phần trăm** đỏ, số dòng quan sát **▼ −13,0%** đỏ. Số lớn phía trên là **tổng toàn khoảng năm đang chọn**, còn badge chỉ so kỳ năm cuối. Xanh/đỏ biểu thị chiều biến động số học, không kết luận kinh doanh tốt/xấu. Khi không có kỳ đối chiếu hợp lệ hoặc thay đổi làm tròn bằng 0, KPI giữ màu tối trung tính.
 
 ### Biểu đồ “Premiums and claims, in perspective”
 
-**Trả lời:** Premium và claims đi cùng nhau hay tách ra theo thời gian? Đường navy là premium, cam là claims. Chọn `Monthly` để thấy biến động tháng; chọn `Annual` để thấy tổng từng năm. Không ngoại suy phần còn lại của 2023.
+**Trả lời:** Premium và claims đi cùng nhau hay tách ra theo thời gian? Đường xanh rừng là premium, cam là claims. Chọn `Monthly` để thấy biến động tháng; chọn `Annual` để thấy tổng từng năm. Không ngoại suy phần còn lại của 2023.
 
 **Insight mặc định:** Premium tăng qua phần lớn giai đoạn 2003–07/2023, trong khi claims ở dưới premium. Đọc cùng KPI 24,1% để hiểu quy mô chênh lệch trên **toàn kỳ**. Không suy từ hai đường rằng doanh nghiệp có lãi: chi phí khác và đơn vị tiền còn ngoài biểu đồ.
 
@@ -46,7 +46,7 @@ Hai nguồn **không có khóa join theo từng bản ghi**. Vì vậy ba trang 
 
 **Câu kết cho trang:** “Premium tăng và tập trung ở một số công ty/dòng sản phẩm. Tỷ lệ claims/premiums là một chỉ báo tổng hợp cần theo dõi theo thời gian; ba biểu đồ cho biết *bao nhiêu, khi nào, và tập trung ở đâu*, chứ chưa giải thích nguyên nhân.”
 
-Trong app có đoạn nối câu chuyện tự thay theo filter: mặc định top 10 công ty chiếm **63,2%**, top 8 dòng sản phẩm chiếm **74,3%** toàn premium đang chọn. Mẫu số là **tất cả premium của selection**, không chỉ tổng top-N. Đường premium là navy liền, claim là cam đứt; legend nằm trong chart nên vẫn đi cùng file PNG. Nhãn và đơn vị vẫn cần đọc dù đã phân biệt màu.
+Trong app có đoạn nối câu chuyện tự thay theo filter: mặc định top 10 công ty chiếm **63,2%**, top 8 dòng sản phẩm chiếm **74,3%** toàn premium đang chọn. Mẫu số là **tất cả premium của selection**, không chỉ tổng top-N. Đường premium xanh rừng liền, claim cam đứt; legend nằm trong chart nên vẫn đi cùng file PNG. Nhãn và đơn vị vẫn cần đọc dù đã phân biệt màu.
 
 ## Trang 2 — Motor risk & ML
 

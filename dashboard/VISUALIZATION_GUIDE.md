@@ -119,7 +119,7 @@ Các biến thể reference line, drop line, marker/line style là kỹ thuật 
 | M08 / hình và nét | Dùng nét đậm/nhạt, hình để thêm phân biệt | Hình vuông/tròn/tam giác, đường đậm | C2 p26–28 | EXPLICIT |
 | M09 / nền | Giảm nổi bật phần nền để thấy dữ liệu | Các đường bối cảnh nhạt, điểm trọng tâm rõ | C1 p17; C2 p27–28 | INFERRED cho màu nền/card UI |
 
-**Thiết kế triển khai của repo**, không phải palette bắt buộc của bài giảng: premium xanh rừng `#164b43`; claim và observed HasClaim đất cam `#b66743`; model score tím `#75668d`; counts/context xám xanh; sau index teal `#23756c`. Nền giấy ấm và card trắng ngà theo giao diện Research Desk. Nét đứt/marker, nhãn và tooltip bổ sung màu; việc chọn HEX hay kiểm tỷ lệ tương phản là quyết định kỹ thuật. Màu cam chỉ nhận diện đại lượng, không tự khẳng định “xấu”. Riêng KPI Market, xanh/đỏ chỉ biểu diễn **chiều tăng/giảm số học** khi so cùng tháng với năm trước; màu tối khi không có so sánh hợp lệ hoặc thay đổi làm tròn bằng 0.
+**Thiết kế triển khai của repo**, không phải palette bắt buộc của bài giảng: premium xanh rừng `#164b43`; claim và observed HasClaim đất cam `#b66743`; model score tím `#75668d`; counts/context xám xanh; sau index teal `#23756c`. Nền giấy ấm và card trắng ngà theo giao diện Research Desk. Nét đứt/marker, nhãn và tooltip bổ sung màu; việc chọn HEX hay kiểm tỷ lệ tương phản là quyết định kỹ thuật. Màu cam chỉ nhận diện đại lượng, không tự khẳng định “xấu”. Riêng KPI Market, xanh/đỏ chỉ biểu diễn **chiều tăng/giảm số học** giữa năm đầu và cuối của khoảng chọn trên cùng tháng; một năm thì so năm trước. Màu tối khi không có so sánh hợp lệ hoặc thay đổi làm tròn bằng 0.
 
 ## 6. Bố cục, tương tác và storytelling
 
@@ -201,3 +201,7 @@ Giữ Dash, snapshot, CSV/PNG, reset, filter session, header ngang ba mục ti�
 - Badge Market dùng tam giác ▲/▼ và xanh/đỏ cho **dấu tăng/giảm của số**, kể cả tỷ lệ claims/premiums. Giá trị mặc định ▼ −4,9 điểm phần trăm nay đỏ. Đây là quy ước giao diện theo yêu cầu owner, **không phải kết luận nghiệp vụ** tỷ lệ thấp hơn là xấu.
 - So sánh SQL trước đây dùng bar từ 0 theo V10 nên đúng tỉ lệ độ dài; nhưng mức giảm gần 99% khiến hai thanh sau rất nhỏ, còn Q1/Q2 thiếu nghĩa khi đọc nhanh. Theo mục tiêu **chọn cách biểu đạt giúp người xem trả lời câu hỏi** (V05,V19,V24; C2 p11, C5 p34–36), dùng hai thẻ số rõ tên workload, số reads trước/sau và % giảm. Không còn mã Q1/Q2 trong UI. Đây là quyết định triển khai theo dữ liệu hiện có, không gán thành quy tắc giảng viên dạy phải bỏ bar trong mọi trường hợp.
 - Giữ **hai mốc thời gian riêng**: snapshot warehouse 11/11/2026 và benchmark SQL 24/09/2026. Hai covering indexes thêm 924,51 MB storage và có chi phí ghi; số page reads giảm không tự chứng minh thời gian end-to-end của dashboard giảm tương ứng.
+
+## 11. Sửa so sánh KPI khi đổi khoảng năm
+
+Sau phản hồi tiếp theo, badge Market so **năm cuối với năm đầu của khoảng được chọn** trên cùng các tháng đang có ở năm cuối. Chọn 2008–2023 cho premium **+395,5%**; chọn 2015–2023 cho **+81,3%**. Cả bốn badge thay theo hai đầu khoảng, trong khi số lớn vẫn cộng toàn khoảng. Nếu chọn đúng một năm, so với năm trước; nếu thiếu baseline thì số màu tối và không hiện badge. Phần ví dụ `−4,9 pp` ở mục 10 là kết quả của cách so 2023/2022 trước khi sửa; mặc định 2003–2023 hiện so 2023/2003 và cho `−25,9 pp`.

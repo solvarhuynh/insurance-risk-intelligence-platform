@@ -24,7 +24,7 @@ Hai nguồn **không có khóa join theo từng bản ghi**. Vì vậy ba trang 
 - `Total claims`: tổng claims báo cáo, khoảng **735,52 tỷ**. Đây là số tiền tổng hợp của nguồn, không phải số claim event.
 - `Claims / premiums`: lấy **tổng claims chia tổng premiums** khi mẫu số dương; mặc định **24,1%**. Không phải lợi nhuận hay loss ratio được chuẩn hóa theo mọi loại sản phẩm.
 - `Market observations`: **8.338.214** dòng fact ở bộ lọc mặc định. Một dòng là công ty × tháng × sản phẩm × bang.
-- Cả bốn badge biến động so **cùng các tháng của năm cuối được chọn với năm trước**, cùng bang. Với 2023, chỉ so tháng 01–07 với 01–07/2022: premium **▲ +8,9%** xanh, claims **▼ −11,9%** đỏ, tỷ lệ claims/premiums **▼ −4,9 điểm phần trăm** đỏ, số dòng quan sát **▼ −13,0%** đỏ. Số lớn phía trên là **tổng toàn khoảng năm đang chọn**, còn badge chỉ so kỳ năm cuối. Xanh/đỏ biểu thị chiều biến động số học, không kết luận kinh doanh tốt/xấu. Khi không có kỳ đối chiếu hợp lệ hoặc thay đổi làm tròn bằng 0, KPI giữ màu tối trung tính.
+- Cả bốn badge biến động so **năm cuối với năm đầu của khoảng được chọn**, cùng bang và cùng các tháng có trong năm cuối. Mặc định chọn 2003–2023, chỉ so tháng 01–07/2023 với 01–07/2003: premium **▲ +1.056,1%** xanh, claims **▲ +413,5%** xanh, tỷ lệ claims/premiums **▼ −25,9 điểm phần trăm** đỏ, số dòng quan sát **▲ +127,4%** xanh. Đổi năm đầu từ 2008 sang 2015 thì premium đổi từ **+395,5%** (2023/2008) thành **+81,3%** (2023/2015). Nếu chọn đúng một năm, badge so năm đó với năm trước; năm 2003 không có baseline 2002 nên KPI màu tối. Số lớn phía trên là **tổng toàn khoảng năm đang chọn**, còn badge so hai năm ở hai đầu. Xanh/đỏ chỉ là chiều biến động số học, không kết luận kinh doanh tốt/xấu.
 
 ### Biểu đồ “Premiums and claims, in perspective”
 

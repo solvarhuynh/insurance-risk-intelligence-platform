@@ -5,10 +5,10 @@
 !data/
 !vercel.json
 !.python-version
+!pyproject.toml
 
 api/*
 !api/index.py
-!api/requirements.txt
 
 dashboard/*
 !dashboard/app.py

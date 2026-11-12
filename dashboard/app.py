@@ -13,9 +13,9 @@ from dash import Dash, Input, Output, State, ctx, dcc, html, no_update
 
 from dashboard.data import latest_market_comparison, market_frames, risk_frames, snapshot, table
 
-BLUE, TEAL, ORANGE, INK, MUTED = "#003366", "#007c83", "#b66a45", "#13334b", "#61768a"
-SCORE, CONTEXT = "#7560a6", "#93a5b5"
-PALE_BLUE, GRID = "#9db9cb", "#e5edf2"
+BLUE, TEAL, ORANGE, INK, MUTED = "#164b43", "#23756c", "#b66743", "#243b35", "#66766f"
+SCORE, CONTEXT = "#75668d", "#a8b9b1"
+PALE_BLUE, GRID = "#aac4b8", "#e8e9e0"
 EXPLORER_PAGE_SIZE = 15
 STATES = {
     "AC": "Acre", "AL": "Alagoas", "AM": "Amazonas", "AP": "Amapá", "BA": "Bahia",
@@ -138,19 +138,28 @@ def graph(graph_id=None, *, chart=None):
                                      "toImageButtonOptions": {"format": "png", "scale": 2}}), className="chart-frame")
 
 
-def chart_card(title, subtitle, graph_id, *, wide=False, controls=None, headline_id=None, footer=None):
+def chart_card(title, subtitle, graph_id, *, wide=False, controls=None, headline_id=None, footer=None, number=None):
     heading = html.H2(title, id=headline_id) if headline_id else html.H2(title)
     return html.Section([
-        html.Div([html.Div([heading, html.P(subtitle)]), controls], className="chart-heading"), graph(graph_id),
+        html.Div([html.Div([html.Span(f"FIG. {number}", className="figure-number") if number else None,
+                            heading, html.P(subtitle)]), controls], className="chart-heading"), graph(graph_id),
         html.Div(footer, className="chart-footnote") if footer else None,
     ], className="chart-card wide" if wide else "chart-card")
 
 
-def page_header(kicker, title, description, scope_label, scope_value, scope_note):
+def page_header(kicker, title, description, scope_label, scope_value, scope_note, *, number):
     return html.Div([
+        html.Span(number, className="page-index", **{"aria-hidden": "true"}),
         html.Div([html.Div(kicker, className="eyebrow"), html.H1(title), html.P(description)]),
         html.Div([html.Span(scope_label), html.Strong(scope_value), html.Small(scope_note)], className="coverage"),
     ], className="page-heading")
+
+
+def readout(content_id, title):
+    return html.Section([
+        html.Div([html.Span("THE READOUT", className="eyebrow"), html.H2(title)]),
+        html.P(id=content_id, **{"aria-live": "polite"}),
+    ], className="insight-strip")
 
 
 def provenance():
@@ -179,7 +188,7 @@ def market_page():
     return [
         page_header("MARKET INTELLIGENCE / TRACK A", "Insurance market overview",
                     "Follow premiums and claims over time, then see which insurers and products shape that volume.",
-                    "SOURCE COVERAGE", "Jan 2003 — Jul 2023", "SUSEP · 27 Brazilian states"),
+                    "SOURCE COVERAGE", "Jan 2003 — Jul 2023", "SUSEP · 27 Brazilian states", number="01"),
         html.Div([
             state_filter("market", sorted(monthly["state"].unique())),
             html.Div([
@@ -196,18 +205,18 @@ def market_page():
         html.Div([
             chart_card("Premiums and claims, in perspective",
                        "Compare reported premiums and claims over the selected period. Values in billions of source units.",
-                       "market-trend", wide=True, headline_id="market-takeaway",
+                       "market-trend", wide=True, headline_id="market-takeaway", number="01",
                        controls=dcc.RadioItems(id="market-grain", options=[{"label": "Monthly", "value": "monthly"},
                                               {"label": "Annual", "value": "annual"}], value="monthly", className="segmented"),
                        footer="2023 includes January–July only. Claims / premiums is a descriptive ratio, not a profit margin."),
             chart_card("Which companies lead premium volume?",
                        "Top 10 insurers; premiums in billions of source units. Hover for source names and shares of all selected premiums.",
-                       "market-companies"),
+                       "market-companies", number="02"),
             chart_card("Where is premium volume concentrated?",
                        "Top 8 product lines; premiums in billions of source units. The same selection, viewed by product rather than insurer.",
-                       "market-products"),
+                       "market-products", number="03"),
         ], className="chart-grid"),
-        html.Div(id="market-story", className="insight-strip", **{"aria-live": "polite"}),
+        readout("market-story", "Read the pattern across all three views"),
     ]
 
 
@@ -216,7 +225,7 @@ def risk_page():
     return [
         page_header("MOTOR ANALYTICS / TRACK B", "Motor risk & model insights",
                     "Read exposure and claim patterns first, then compare held-out model scores with observed outcomes.",
-                    "MODEL EVALUATION", f"{metrics['rows']:,} held-out observations", "Historical evaluation · September 2026"),
+                    "MODEL EVALUATION", f"{metrics['rows']:,} held-out observations", "Historical evaluation · September 2026", number="02"),
         html.Div([
             state_filter("risk", sorted(table("risk", "segments")["state"].unique())),
             html.Button([icon("reset"), "Reset"], id="risk-reset", className="button quiet"), export_button("risk"),
@@ -227,8 +236,8 @@ def risk_page():
                  className="section-heading"),
         html.Div(id="risk-metrics", className="metrics warehouse-metrics", **{"aria-live": "polite"}),
         html.Div([
-            chart_card("Observed claim share varies by age group", "Share of observations with HasClaim, across the full filtered risk warehouse.", "risk-age"),
-            chart_card("The observation mix behind the analysis", "Counts by source Gender label, including corporate and unknown records.", "risk-gender"),
+            chart_card("Observed claim share varies by age group", "Share of observations with HasClaim, across the full filtered risk warehouse.", "risk-age", number="01"),
+            chart_card("The observation mix behind the analysis", "Counts by source Gender label, including corporate and unknown records.", "risk-gender", number="02"),
         ], className="chart-grid"),
         html.Div([
             html.Div([html.Span("02 / HELD-OUT EVALUATION", className="eyebrow"),
@@ -243,12 +252,12 @@ def risk_page():
         ], className="model-summary"),
         html.Div([
             chart_card("Where model scores are concentrated", "Held-out association scores in 0.05-wide bands; not validated future claim probabilities.",
-                       "risk-distribution", headline_id="risk-takeaway",
+                       "risk-distribution", headline_id="risk-takeaway", number="03",
                        footer="Darker bins identify scores below 0.20 for description only; 0.20 is not a classification threshold."),
             chart_card("How scores relate to observed claims", "The same held-out score bands: observed HasClaim share versus mean model score.",
-                       "risk-observed", footer="Hover for band size. Small groups can fluctuate; gaps mean no observations in a band."),
+                       "risk-observed", number="04", footer="Hover for band size. Small groups can fluctuate; gaps mean no observations in a band."),
         ], className="chart-grid"),
-        html.Div(id="risk-story", className="insight-strip", **{"aria-live": "polite"}),
+        readout("risk-story", "What the score pattern supports"),
     ]
 
 
@@ -314,7 +323,7 @@ def platform_page():
     return [
         page_header("PLATFORM ASSURANCE / ENGINEERING", "See the data behind the platform",
                     "Inspect warehouse aggregates, then weigh faster SQL reads against their storage cost.",
-                    "EVIDENCE WINDOW", "Snapshot + historical benchmark", "SQL benchmark measured 24 Sep 2026"),
+                    "EVIDENCE WINDOW", "Snapshot + historical benchmark", "SQL benchmark measured 24 Sep 2026", number="03"),
         html.Div([
             metric("Warehouse observations", number(counts["market_fact"] + counts["risk_fact"]), "Across two independent data tracks", symbol="database"),
             metric("Row-count reconciliation", f"{matched} / 2", "Staging and fact counts in this snapshot", symbol="check", tone="positive" if matched == 2 else "negative"),
@@ -363,7 +372,7 @@ app.layout = html.Div([
         ], className="nav-items"), **{"aria-label": "Analytics sections"}),
     ], className="header-inner"), className="app-header"),
     html.Main([
-        html.Header([html.Div([html.Span("Workspace"), html.Span("/", className="breadcrumb-divider"), html.Strong("Insurance analytics")], className="breadcrumb"),
+        html.Header([html.Div([html.Span("RESEARCH DESK"), html.Span("/", className="breadcrumb-divider"), html.Strong("BRAZIL · INSURANCE")], className="breadcrumb"),
                      html.Div(id="source-meta")], className="topbar"),
         html.Div(id="page-content"),
     ], className="workspace"),
@@ -467,7 +476,8 @@ def update_market(state, years, grain="monthly"):
     plot = figure("Market trend " + grain, "Year" if annual else "Month", "Billions · source units")
     for column, name, color in [("premium", "Premiums", BLUE), ("claims", "Claims", ORANGE)]:
         plot.add_scatter(x=trend["period"], y=trend[column] / 1e9, name=name, mode="lines+markers" if annual else "lines",
-                         line=dict(color=color, width=2.6, dash="dash" if column == "claims" else "solid"), marker=dict(size=5),
+                         line=dict(color=color, width=2.5 if column == "claims" else 3.2,
+                                   dash="dash" if column == "claims" else "solid"), marker=dict(size=5),
                          customdata=["Jan–Jul only" if annual and str(p) == "2023" else "Reported period" for p in trend["period"]],
                          hovertemplate=f"%{{x}} · %{{customdata}}<br>{name}: %{{y:,.2f}}B source units<extra></extra>")
     plot.update_layout(showlegend=True, margin=dict(t=54))

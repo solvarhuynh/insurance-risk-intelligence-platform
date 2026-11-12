@@ -15,6 +15,7 @@
 <p align="center">
   <a href="#data-engineering">Explore the engineering</a> ·
   <a href="#dashboard-stories">View the insights</a> ·
+  <a href="https://insurance-risk-intelligence-platfor.vercel.app/">Open the dashboard</a> ·
   <a href="#quick-start">Run the dashboard</a> ·
   <a href="#technology-map">View the technology map</a>
 </p>
@@ -143,7 +144,7 @@ py -3.12 -m venv .venv
 .venv\Scripts\python.exe -m dashboard.app
 ```
 
-Open **http://127.0.0.1:8050**. If the virtual environment already exists, skip its creation. This path reads `data/dashboard.json` and needs no SQL Server login, raw CSV, `.env`, or private model binary. Stop the app with `Ctrl+C`. To refresh the displayed data after a new SQL load, run `export` in the full pipeline below and reload the page. No public dashboard URL is configured yet.
+Open **http://127.0.0.1:8050** locally, or use the [public dashboard](https://insurance-risk-intelligence-platfor.vercel.app/). If the virtual environment already exists, skip its creation. Both views read the dated aggregate snapshot in `data/dashboard.json` and need no SQL Server login, raw CSV, `.env`, or private model binary. Stop the local app with `Ctrl+C`. To refresh the displayed data after a new SQL load, run `export` in the full pipeline below; the public site updates after the new snapshot is deployed.
 
 ## Run the full pipeline
 

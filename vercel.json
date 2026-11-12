@@ -1,11 +1,9 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "flask",
   "functions": {
     "api/index.py": {
       "includeFiles": "{dashboard/assets/style.css,dashboard/assets/inter.woff2,data/dashboard.json}"
     }
-  },
-  "rewrites": [
-    { "source": "/(.*)", "destination": "/api/index" }
-  ]
+  }
 }

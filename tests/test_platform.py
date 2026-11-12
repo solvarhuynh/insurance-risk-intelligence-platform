@@ -64,19 +64,26 @@ class PlatformTests(unittest.TestCase):
 
     def test_latest_year_comparison_matches_months_and_geography(self):
         current = pd.DataFrame({"month": ["2023-01-01", "2023-02-01"], "year": [2023, 2023],
-                                "premium": [100., 200.], "claims": [50., 100.]})
+                                "premium": [100., 200.], "claims": [50., 100.], "observations": [20, 30]})
         previous = pd.DataFrame({"month": ["2022-01-01", "2022-02-01", "2022-03-01", "2022-01-01"],
                                  "state": ["SP", "SP", "SP", "RJ"], "premium": [200., 200., 99999., 99999.],
-                                 "claims": [40., 40., 0., 0.]})
+                                 "claims": [40., 40., 0., 0.], "observations": [10, 10, 999, 999]})
         with patch("dashboard.data.table", return_value=previous):
             comparison = latest_market_comparison(current, "SP")
         self.assertEqual(comparison["period"], "Jan–Feb 2023 vs 2022")
         self.assertAlmostEqual(comparison["premium_change"], -25)
+        self.assertAlmostEqual(comparison["claims_change"], 87.5)
         self.assertAlmostEqual(comparison["ratio_change_pp"], 30)
+        self.assertAlmostEqual(comparison["observations_change"], 150)
         self.assertIn("negative", market_change(comparison, "premium_change").children[0].className)
         self.assertIn("positive", market_change(comparison, "ratio_change_pp", lower_is_better=True).children[0].className)
         self.assertIn("▼", market_change(comparison, "premium_change").children[0].children)
         self.assertIn("▲", market_change({"ratio_change_pp": 1.7, "period": "2023 vs 2022"}, "ratio_change_pp", lower_is_better=True).children[0].children)
+        self.assertIn("positive", market_change(comparison, "claims_change").children[0].className)
+        self.assertIn("positive", market_change(comparison, "observations_change").children[0].className)
+        unchanged = market_change({"premium_change": -0.001, "period": "2023 vs 2022"}, "premium_change")
+        self.assertIn("neutral", unchanged.children[0].className)
+        self.assertIn("● 0.0%", unchanged.children[0].children)
         with patch("dashboard.data.table", return_value=previous.iloc[[0]]):
             self.assertEqual(latest_market_comparison(current, "SP"), {})
         self.assertEqual(latest_market_comparison(current.iloc[:0], "SP"), {})

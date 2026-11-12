@@ -37,8 +37,11 @@ def check(base_url: str, screenshot: bool, screenshots_dir: Path | None = None) 
         assert page.locator("#market-trend .main-svg").count() > 0
         assert page.locator("#market-trend").bounding_box()["height"] >= 290
         assert page.locator(".sidebar-data, .reading-note, .scope-note, .workspace footer").count() == 0
-        expect(page.locator("#market-metrics .metric-change.positive")).to_contain_text("▲ +8.9%")
-        expect(page.locator("#market-metrics .metric-change.negative")).to_contain_text("▼ -4.9 pp")
+        for index, expected, tone in ((0, "▲ +8.9%", "positive"), (1, "▼ -11.9%", "negative"),
+                                      (2, "▼ -4.9 pp", "negative"), (3, "▼ -13.0%", "negative")):
+            card = page.locator("#market-metrics .metric").nth(index)
+            expect(card.locator(f".metric-change.{tone}")).to_contain_text(expected)
+            assert tone in card.get_attribute("class")
         expect(page.locator("#market-metrics")).to_contain_text("Jan–Jul 2023 vs 2022")
         assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticklabelstandoff") == 18
         assert page.evaluate("document.querySelector('#market-products .js-plotly-plot').layout.yaxis.ticktext.every(t => !t.includes('<br>'))")

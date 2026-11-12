@@ -96,18 +96,27 @@ def metric(label, value, detail, *, symbol="rows", tone="neutral", exact=None, c
 
 
 def market_change(comparison, key, *, lower_is_better=False):
-    if not comparison:
+    if not comparison or key not in comparison:
         return None
     change = comparison[key]
     rounded = round(change, 1)
-    tone = "neutral" if rounded == 0 else "positive" if rounded > 0 else "negative"
+    tone = market_tone(comparison, key)
     arrow = "●" if rounded == 0 else "▲" if rounded > 0 else "▼"
+    display_change = "0.0" if rounded == 0 else f"{rounded:+.1f}"
     unit = " pp" if lower_is_better else "%"
-    meaning = "Claims / premiums" if lower_is_better else "Premium volume"
+    meaning = {"premium_change": "Premium volume", "claims_change": "Claim volume",
+               "ratio_change_pp": "Claims / premiums", "observations_change": "Reported rows"}[key]
     return html.Div([
-        html.Span(f"{arrow} {rounded:+.1f}{unit} · latest year", className=f"metric-change {tone}"),
+        html.Span(f"{arrow} {display_change}{unit} · latest year", className=f"metric-change {tone}"),
         html.Span(comparison["period"], className="comparison-period"),
-    ], className="metric-comparison", title=f"{meaning} change. Color and arrow show direction only. Same calendar months: {comparison['period']}. Totals above cover the selected range.")
+    ], className="metric-comparison", title=f"{meaning} change. Color and arrow show numerical direction, not business performance. Same calendar months: {comparison['period']}. Totals above cover the selected range.")
+
+
+def market_tone(comparison, key):
+    if not comparison or key not in comparison:
+        return "neutral"
+    rounded = round(comparison[key], 1)
+    return "neutral" if rounded == 0 else "positive" if rounded > 0 else "negative"
 
 
 def figure(key, x, y):
@@ -464,11 +473,17 @@ def update_market(state, years, grain="monthly"):
     comparison = latest_market_comparison(monthly, state)
     cards = [
         metric("Total premiums", number(premium), "Source units · selected period", symbol="premium", exact=f"{premium:,.2f}",
+               tone=market_tone(comparison, "premium_change"),
                comparison=market_change(comparison, "premium_change")),
-        metric("Total claims", number(claims), "Source units · reported claims", symbol="claims", tone="cost", exact=f"{claims:,.2f}"),
+        metric("Total claims", number(claims), "Source units · reported claims", symbol="claims", exact=f"{claims:,.2f}",
+               tone=market_tone(comparison, "claims_change"),
+               comparison=market_change(comparison, "claims_change")),
         metric("Claims / premiums", number(claim_ratio, percent=True), "Ratio of totals within your selection", symbol="percent",
+               tone=market_tone(comparison, "ratio_change_pp"),
                comparison=market_change(comparison, "ratio_change_pp", lower_is_better=True)),
-        metric("Market observations", number(observations), f"{years[0]}–{years[1]} · {state if state != 'ALL' else 'All states'}", exact=f"{observations:,}"),
+        metric("Market observations", number(observations), f"{years[0]}–{years[1]} · {state if state != 'ALL' else 'All states'}", exact=f"{observations:,}",
+               tone=market_tone(comparison, "observations_change"),
+               comparison=market_change(comparison, "observations_change")),
     ]
     trend = monthly.assign(period=monthly["month"].str[:4] if grain == "annual" else monthly["month"])
     trend = trend.groupby("period", as_index=False)[["premium", "claims"]].sum()

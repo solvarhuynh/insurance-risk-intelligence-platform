@@ -345,13 +345,13 @@ h1 { margin: 8px 0 12px; color: #183b33; font: 500 clamp(36px, 3.55vw, 58px)/1.0
 .metric { min-height: 173px; padding: 22px 18px 18px; border: 0; border-right: 1px solid var(--line); border-radius: 0; box-shadow: none; background: transparent; }
 .metric:last-child { border-right: 0; }
 .metric-top { gap: 8px; }
-.metric-top .icon { color: #7e9d88; }
+.metric-top .icon { color: #728078; }
 .metric-label { color: #586d61; font-size: 11px; font-weight: 650; letter-spacing: .15px; }
-.metric strong { color: #174b42; font-size: clamp(28px, 2.6vw, 39px); font-weight: 650; letter-spacing: -1.5px; }
+.metric strong { color: #2a3837; font-size: clamp(28px, 2.6vw, 39px); font-weight: 650; letter-spacing: -1.5px; }
 .metric small { color: #6b7a70; font-size: 10px; }
 .metric.cost .icon { color: #b66743; }
-.metric.positive strong, .metric.positive .icon { color: #2a765e; }
-.metric.negative strong, .metric.negative .icon { color: #ab4d46; }
+.metric.positive strong, .metric.positive .icon { color: #167455; }
+.metric.negative strong, .metric.negative .icon { color: #b54849; }
 .metric-comparison { border-color: #e8e9e1; }
 .metric-change.positive { color: #276d51; background: #e6f0e8; }
 .metric-change.negative { color: #a84440; background: #f8e9e5; }

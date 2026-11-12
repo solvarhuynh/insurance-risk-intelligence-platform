@@ -57,13 +57,14 @@ def latest_market_comparison(monthly: pd.DataFrame, state: str | None) -> dict:
     latest = int(monthly["year"].max())
     current = monthly.loc[monthly["year"] == latest].copy()
     current["calendar_month"] = current["month"].str[5:7].astype(int)
-    current = current.groupby("calendar_month")[["premium", "claims"]].sum()
+    measures = ["premium", "claims", "observations"]
+    current = current.groupby("calendar_month")[measures].sum()
     previous = table("market", "monthly")
     previous = previous.loc[previous["month"].str[:4] == str(latest - 1)].copy()
     if state and state != "ALL":
         previous = previous.loc[previous["state"] == state]
     previous["calendar_month"] = previous["month"].str[5:7].astype(int)
-    previous = previous.groupby("calendar_month")[["premium", "claims"]].sum().reindex(current.index)
+    previous = previous.groupby("calendar_month")[measures].sum().reindex(current.index)
     if previous.isna().any().any():
         return {}
     now, before = current.sum(), previous.sum()
@@ -75,8 +76,13 @@ def latest_market_comparison(monthly: pd.DataFrame, state: str | None) -> dict:
     period = start if len(months) == 1 else f"{start}–{end}"
     if months != list(range(months[0], months[-1] + 1)):
         period = f"{len(months)} matched months"
-    return {
+    comparison = {
         "period": f"{period} {latest} vs {latest - 1}",
         "premium_change": 100 * (now["premium"] / before["premium"] - 1),
         "ratio_change_pp": 100 * (now["claims"] / now["premium"] - before["claims"] / before["premium"]),
     }
+    if before["claims"] > 0:
+        comparison["claims_change"] = 100 * (now["claims"] / before["claims"] - 1)
+    if before["observations"] > 0:
+        comparison["observations_change"] = 100 * (now["observations"] / before["observations"] - 1)
+    return comparison
